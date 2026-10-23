@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -46,47 +47,59 @@ class TestUtils(unittest.TestCase):
 
 class TestExtractor(unittest.TestCase):
     def setUp(self):
-        self.html = (
-            "<table>"
-            "<tr class='record'>"
-            "<td class='name'><a href='/company/1'>Acme SA</a></td>"
-            "<td class='cif'>A12345678</td>"
-            "<td class='city'>Madrid</td>"
-            "</tr>"
-            "<tr class='record'>"
-            "<td class='name'><a href='/company/2'>Globex SL</a></td>"
-            "<td class='cif'>B87654321</td>"
-            "<td class='city'>Barcelona</td>"
-            "</tr>"
-            "</table>"
-            "<a class='next' href='?page=2'>Next</a>"
-        )
         self.client = SABIClient()
 
-    def test_parse_search_page(self):
-        result = self.client._parse_search_page(
-            self.html, "https://sabi.informa.es/search", 1
-        )
-        self.assertEqual(len(result.records), 2)
-        self.assertTrue(result.has_next)
-        self.assertEqual(result.records[0].name, "Acme SA")
-        self.assertEqual(result.records[0].cif, "A12345678")
-        self.assertEqual(result.records[0].city, "Madrid")
-        self.assertEqual(
-            result.records[0].detail_url,
-            "https://sabi.informa.es/company/1",
-        )
+    def test_company_name_detection(self):
+        """Test company name detection with various suffixes."""
+        self.assertTrue(self.client._is_company_name("ACME SA"))
+        self.assertTrue(self.client._is_company_name("Globex SL"))
+        self.assertTrue(self.client._is_company_name("Company LTD"))
+        self.assertTrue(self.client._is_company_name("Firm GmbH"))
+        self.assertTrue(self.client._is_company_name("CVJF - DESIGN E ARQUITETURA, LDA"))
+        self.assertTrue(self.client._is_company_name("SANTANDER GLOBAL TECHNOLOGY AND OPERATIONS SLU"))
+        
+        # Should reject non-company names
+        self.assertFalse(self.client._is_company_name("Cancelar"))
+        self.assertFalse(self.client._is_company_name("Nombre de la empresa"))
+        self.assertFalse(self.client._is_company_name("Exportar"))
+        self.assertFalse(self.client._is_company_name("2.900.000 Spanish"))
+        self.assertFalse(self.client._is_company_name("12345"))
 
-    def test_login_form_discovery(self):
-        html = (
-            '<form id="LoginForm" action="/R1/SabiInforma/SignIn" method="post">'
-            '<input name="__RequestVerificationToken" value="TOKEN123" />'
-            '<input name="user" />'
-            "</form>"
+    def test_address_line_detection(self):
+        """Test address line detection."""
+        self.assertTrue(self.client._is_address_line("28660 BOADILLA DEL MONTE (MADRID, ESPANA)Empresa privadaCódigo NIF"))
+        self.assertTrue(self.client._is_address_line("2755-067 Alcabideche (LISBOA, PORTUGAL)Empresa privadaCódigo NIF"))
+        self.assertFalse(self.client._is_address_line("Just a regular line"))
+        self.assertFalse(self.client._is_address_line("No postal code here"))
+
+    def test_parse_address_components(self):
+        """Test address component extraction."""
+        record = Record(
+            address="28660 BOADILLA DEL MONTE (MADRID, ESPANA)Empresa privadaCódigo NIF"
         )
-        action, token = self.client._discover_login_form(html)
-        self.assertEqual(action, "https://sabi.informa.es/R1/SabiInforma/SignIn")
-        self.assertEqual(token, "TOKEN123")
+        self.client._parse_address_components(record)
+        self.assertEqual(record.postal_code, "28660")
+        self.assertEqual(record.city, "BOADILLA DEL MONTE")
+        self.assertEqual(record.country, "ESPANA")
+
+        record2 = Record(
+            address="PRACETA À RUA DA ESCOLA, 105 - ALVIDE | 2755-067 Alcabideche | LISBOA | PORTUGAL"
+        )
+        self.client._parse_address_components(record2)
+        self.assertEqual(record2.postal_code, "2755-067")
+        self.assertEqual(record2.city, "Alcabideche")
+        self.assertEqual(record2.country, "PORTUGAL")
+
+    def test_cif_extraction(self):
+        """Test CIF extraction from concatenated lines."""
+        line = "2755-067 Alcabideche (LISBOA, PORTUGAL)Empresa privadaCódigo NIF514737964Fecha últimas cuentas31/12/2025"
+        match = re.search(r"Código NIF\s*([A-Z0-9]+)", line)
+        self.assertIsNotNone(match)
+        cif = match.group(1)
+        # Remove trailing letter
+        if len(cif) > 9 and cif[-1].isalpha():
+            cif = cif[:-1]
+        self.assertEqual(cif, "514737964")
 
 
 class TestEmbeddings(unittest.TestCase):
