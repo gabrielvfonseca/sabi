@@ -17,3 +17,16 @@ services:
       --search ""
       --output /data/sabi_records.csv
       --db /data/sabi_records.sqlite
+
+  sabi-mcp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: sabi-extractor:mcp
+    environment:
+      - SABI_USERNAME=${SABI_USERNAME:-}
+      - SABI_PASSWORD=${SABI_PASSWORD:-}
+    ports:
+      - "8000:8000"
+    entrypoint: ["python", "-m", "src.mcp_server"]
+    command: --transport streamable-http --host 0.0.0.0 --port 8000

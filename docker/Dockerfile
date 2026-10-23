@@ -28,11 +28,18 @@ ENV SABI_USERNAME="" \
     SABI_OUTPUT=/data/sabi_records.csv \
     SABI_DB=/data/sabi_records.sqlite
 
+# Port for the MCP streamable-http / SSE transport.
+EXPOSE 8000
+
 VOLUME ["/data"]
 WORKDIR /app
 
 ENTRYPOINT ["python", "-m", "src.cli"]
 CMD ["--help"]
+
+# Override entrypoint to run the MCP server instead of the CLI:
+#   docker run --rm --entrypoint python sabi-extractor -m src.mcp_server \
+#       --transport streamable-http --host 0.0.0.0 --port 8000
 
 FROM runtime AS dev
 RUN --mount=type=cache,target=/root/.cache/pip \
