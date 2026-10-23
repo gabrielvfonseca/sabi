@@ -15,12 +15,12 @@ Entry points: `sabi` (CLI), `sabi-mcp` (MCP server).
 | File | Purpose |
 |------|---------|
 | `src/cli.py` | CLI (`sabi` console script). Parses args, establishes session, searches, writes CSV, upserts to SQLite. |
-| `src/mcp_server.py` | MCP server (`sabi-mcp` console script). Exposes 7 tools over stdio/streamable-http. |
+| `src/mcp_server.py` | MCP server (`sabi-mcp` console script). Exposes 7 tools over stdio/SSE/streamable-http. |
 | `src/extractor.py` | `SABIClient`: HTTP client with credential + network/IP auth, search, pagination, detail-page fetching, HTML parsing via CSS selectors. |
 | `src/models.py` | `Record` dataclass (name, cif, address, city, province, postal_code, phone, activity, detail_url, extras). |
 | `src/utils.py` | `CSV_FIELDS`, `clean()`, `record_to_row()`, `write_csv()`. |
 | `src/embeddings.py` | `EmbeddingStore`: SQLite-backed store with deterministic-hash or sentence-transformers embeddings, upsert, similarity search. |
-| `src/__init__.py` | Package marker, `__version__ = "1.0.0"`. |
+| `src/__init__.py` | Package marker, `__version__ = "0.1.0"`. |
 | `bin/sabi` | Executable wrapper for `src.cli:main` (no install needed). |
 | `bin/sabi-mcp` | Executable wrapper for `src.mcp_server:main`. |
 | `__main__.py` | Root entry point (`python /path/to/repo`). |
@@ -55,7 +55,7 @@ The CLI never requires credentials anymore. Run `./bin/sabi --search "..."` dire
 | `sabi_similarity_search` | `query`, `limit`, `db_path` | Semantic similarity over stored records |
 | `sabi_list_stored` | `db_path` | List all stored records |
 
-Run MCP server: `sabi-mcp --transport stdio` or `--transport streamable-http --port 8000`.
+Run MCP server: `sabi-mcp --transport stdio`, `--transport sse --port 8000`, or `--transport streamable-http --port 8000`.
 
 ## Development workflow
 
