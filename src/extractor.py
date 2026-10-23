@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -71,7 +71,7 @@ class SABIClient:
             }
         )
         self.authenticated = False
-        self.login_action_url: Optional[str] = None
+        self.login_action_url: str | None = None
 
     # ------------------------------------------------------------------ #
     # authentication
@@ -95,7 +95,9 @@ class SABIClient:
         # Step 1: submit the username (first screen of the flow).
         step1 = self._base_form_data(token)
         step1["user"] = username
-        resp = self.session.post(self.login_action_url, data=step1, timeout=self.timeout)
+        resp = self.session.post(
+            self.login_action_url, data=step1, timeout=self.timeout
+        )
         resp.raise_for_status()
 
         # The password screen may re-render with a new token.
@@ -105,7 +107,9 @@ class SABIClient:
         step2 = self._base_form_data(token)
         step2["pw"] = password
         step2["stayLoggedIn"] = "1"
-        resp = self.session.post(self.login_action_url, data=step2, timeout=self.timeout)
+        resp = self.session.post(
+            self.login_action_url, data=step2, timeout=self.timeout
+        )
         resp.raise_for_status()
 
         self.authenticated = self._is_authenticated(resp)
@@ -120,7 +124,7 @@ class SABIClient:
         }
 
     @staticmethod
-    def _discover_login_form(html: str) -> tuple[Optional[str], Optional[str]]:
+    def _discover_login_form(html: str) -> tuple[str | None, str | None]:
         """Return (form_action_url, csrf_token) from the login page markup."""
         soup = BeautifulSoup(html, "html.parser")
         form = soup.find("form", id="LoginForm") or soup.find("form")
@@ -134,7 +138,7 @@ class SABIClient:
         return action_url, token
 
     @staticmethod
-    def _extract_csrf_token(html: str) -> Optional[str]:
+    def _extract_csrf_token(html: str) -> str | None:
         soup = BeautifulSoup(html, "html.parser")
         tag = soup.find("input", {"name": "__RequestVerificationToken"})
         if tag and tag.get("value"):
@@ -223,7 +227,7 @@ class SABIClient:
     # ------------------------------------------------------------------ #
     # pagination helper
     # ------------------------------------------------------------------ #
-    def iter_search(self, query: str = "", max_pages: Optional[int] = None) -> Iterable[Record]:
+    def iter_search(self, query: str = "", max_pages: int | None = None) -> Iterable[Record]:
         """Yield records across search pages until exhaustion or max_pages."""
         page = 1
         while True:

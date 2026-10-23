@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 import re
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
 
 CSV_FIELDS = [
     "name",

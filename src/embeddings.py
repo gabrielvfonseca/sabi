@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import math
-import os
 import sqlite3
 import struct
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from .models import Record
 
@@ -125,7 +124,9 @@ class EmbeddingStore:
             "activity, detail_url FROM records"
         )
         columns = [d[0] for d in cur.description]
-        return [dict(zip(columns, row)) for row in cur.fetchall()]
+        return [
+            dict(zip(columns, row, strict=False)) for row in cur.fetchall()
+        ]
 
     def search_similar(self, query: str, limit: int = 10) -> list[dict]:
         """Return records ordered by cosine similarity to *query* (SQLite fallback).
@@ -133,7 +134,6 @@ class EmbeddingStore:
         Without the sqlite-vec extension this computes similarity in Python over
         all stored embeddings. Fine for modest datasets.
         """
-        import math
 
         q_emb = self._embed_fn(query)
         rows = self._conn.execute(
@@ -154,7 +154,9 @@ class EmbeddingStore:
             "cif", "name", "address", "city", "province", "postal_code",
             "phone", "activity", "detail_url",
         ]
-        return [dict(zip(columns, row)) for _, row in scored[:limit]]
+        return [
+            dict(zip(columns, row, strict=False)) for _, row in scored[:limit]
+        ]
 
     def close(self) -> None:
         self._conn.close()
@@ -167,7 +169,7 @@ class EmbeddingStore:
         return struct.pack(f"<{len(vec)}f", *vec)
 
     @staticmethod
-    def _deserialize_embedding(blob: Optional[bytes]) -> Optional[list[float]]:
+    def _deserialize_embedding(blob: bytes | None) -> list[float] | None:
         if not blob:
             return None
         n = len(blob) // 4
@@ -175,7 +177,7 @@ class EmbeddingStore:
 
     @staticmethod
     def _cosine(a: list[float], b: list[float]) -> float:
-        dot = sum(x * y for x, y in zip(a, b))
+        dot = sum(x * y for x, y in zip(a, b, strict=False))
         na = math.sqrt(sum(x * x for x in a))
         nb = math.sqrt(sum(x * x for x in b))
         if na == 0 or nb == 0:

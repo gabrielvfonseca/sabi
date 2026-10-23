@@ -5,13 +5,11 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import sys
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
-from .extractor import SABIClient, ExtractResult, LOGIN_PAGE_URL, SEARCH_URL
 from .embeddings import EmbeddingStore
-from .models import Record
-from .utils import CSV_FIELDS, clean, write_csv
+from .extractor import LOGIN_PAGE_URL, SEARCH_URL, SABIClient
+from .utils import CSV_FIELDS, write_csv
 
 logger = logging.getLogger("sabi_extractor")
 
@@ -61,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
