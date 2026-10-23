@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The following versions of `sabi-extractor` currently receive security updates:
+The following versions of `sabi` currently receive security updates:
 
 | Version | Supported |
 |---------|-----------|

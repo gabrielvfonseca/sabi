@@ -33,14 +33,14 @@ pip install -e ".[embeddings]"
 export SABI_USERNAME="your-username"
 export SABI_PASSWORD="your-password"
 
-./bin/sabi-extractor --search "madrid software" \
+./bin/sabi --search "madrid software" \
     --output records.csv --db records.sqlite
 ```
 
 ### Run via the installed entry point
 
 ```bash
-sabi-extractor --search "madrid software" \
+sabi --search "madrid software" \
     --output records.csv --db records.sqlite
 ```
 
@@ -101,7 +101,7 @@ Example agent call:
 Build the image:
 
 ```bash
-docker build -t sabi-extractor -f docker/Dockerfile .
+docker build -t sabi -f docker/Dockerfile .
 ```
 
 Run it, mounting a local directory for outputs:
@@ -111,7 +111,7 @@ docker run --rm \
   -e SABI_USERNAME="$SABI_USERNAME" \
   -e SABI_PASSWORD="$SABI_PASSWORD" \
   -v "$PWD/data:/data" \
-  sabi-extractor --search "madrid software" \
+  sabi --search "madrid software" \
     --output /data/sabi_records.csv \
     --db /data/sabi_records.sqlite
 ```

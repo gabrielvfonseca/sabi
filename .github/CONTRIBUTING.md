@@ -1,4 +1,4 @@
-# Contributing to sabi-extractor
+# Contributing to sabi
 
 Thank you for contributing! Please read this short guide before opening issues or pull requests.
 

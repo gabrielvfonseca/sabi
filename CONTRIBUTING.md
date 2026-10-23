@@ -1,4 +1,4 @@
-# Contributing to sabi-extractor
+# Contributing to sabi
 
 Thank you for contributing! Please read this short guide before opening issues or pull requests.
 
@@ -28,10 +28,11 @@ Thank you for contributing! Please read this short guide before opening issues o
 
 ## Making changes
 
-- Follow the existing code style in `src/` and `tests/`.
+- Follow the existing code style in `src/`, `bin/`, and `tests/`.
 - Add tests for new behavior and update tests for changed behavior.
 - Keep credentials out of the repo; use environment variables (`SABI_USERNAME`, `SABI_PASSWORD`) or a local `.env` file (never commit `.env`).
-- Update `README.md` when user-facing behavior changes.
+- Update `README.md` and `USAGE.md` when user-facing behavior or MCP tool specs change.
+- The `bin/sabi` and `bin/sabi-mcp` scripts are executable wrappers; keep them in sync with `src.cli:main` and `src.mcp_server:main`.
 
 ## Submitting a pull request
 
