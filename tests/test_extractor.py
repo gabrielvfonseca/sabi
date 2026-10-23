@@ -55,9 +55,15 @@ class TestExtractor(unittest.TestCase):
         self.assertTrue(self.client._is_company_name("Globex SL"))
         self.assertTrue(self.client._is_company_name("Company LTD"))
         self.assertTrue(self.client._is_company_name("Firm GmbH"))
-        self.assertTrue(self.client._is_company_name("CVJF - DESIGN E ARQUITETURA, LDA"))
-        self.assertTrue(self.client._is_company_name("SANTANDER GLOBAL TECHNOLOGY AND OPERATIONS SLU"))
-        
+        self.assertTrue(
+            self.client._is_company_name("CVJF - DESIGN E ARQUITETURA, LDA")
+        )
+        self.assertTrue(
+            self.client._is_company_name(
+                "SANTANDER GLOBAL TECHNOLOGY AND OPERATIONS SLU"
+            )
+        )
+
         # Should reject non-company names
         self.assertFalse(self.client._is_company_name("Cancelar"))
         self.assertFalse(self.client._is_company_name("Nombre de la empresa"))
@@ -67,8 +73,16 @@ class TestExtractor(unittest.TestCase):
 
     def test_address_line_detection(self):
         """Test address line detection."""
-        self.assertTrue(self.client._is_address_line("28660 BOADILLA DEL MONTE (MADRID, ESPANA)Empresa privadaCódigo NIF"))
-        self.assertTrue(self.client._is_address_line("2755-067 Alcabideche (LISBOA, PORTUGAL)Empresa privadaCódigo NIF"))
+        self.assertTrue(
+            self.client._is_address_line(
+                "28660 BOADILLA DEL MONTE (MADRID, ESPANA)Empresa privadaCódigo NIF"
+            )
+        )
+        self.assertTrue(
+            self.client._is_address_line(
+                "2755-067 Alcabideche (LISBOA, PORTUGAL)Empresa privadaCódigo NIF"
+            )
+        )
         self.assertFalse(self.client._is_address_line("Just a regular line"))
         self.assertFalse(self.client._is_address_line("No postal code here"))
 
@@ -83,7 +97,10 @@ class TestExtractor(unittest.TestCase):
         self.assertEqual(record.country, "ESPANA")
 
         record2 = Record(
-            address="PRACETA À RUA DA ESCOLA, 105 - ALVIDE | 2755-067 Alcabideche | LISBOA | PORTUGAL"
+            address=(
+                "PRACETA À RUA DA ESCOLA, 105 - ALVIDE | "
+                "2755-067 Alcabideche | LISBOA | PORTUGAL"
+            )
         )
         self.client._parse_address_components(record2)
         self.assertEqual(record2.postal_code, "2755-067")
@@ -92,7 +109,10 @@ class TestExtractor(unittest.TestCase):
 
     def test_cif_extraction(self):
         """Test CIF extraction from concatenated lines."""
-        line = "2755-067 Alcabideche (LISBOA, PORTUGAL)Empresa privadaCódigo NIF514737964Fecha últimas cuentas31/12/2025"
+        line = (
+            "2755-067 Alcabideche (LISBOA, PORTUGAL)"
+            "Empresa privadaCódigo NIF514737964Fecha últimas cuentas31/12/2025"
+        )
         match = re.search(r"Código NIF\s*([A-Z0-9]+)", line)
         self.assertIsNotNone(match)
         cif = match.group(1)
