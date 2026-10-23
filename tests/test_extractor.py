@@ -60,7 +60,7 @@ class TestExtractor(unittest.TestCase):
         )
         self.assertTrue(
             self.client._is_company_name(
-                "SANTANDER GLOBAL TECHNOLOGY AND OPERATIONS SLU"
+                "SAMPLE FINANCIAL TECHNOLOGY AND OPERATIONS SLU"
             )
         )
 
