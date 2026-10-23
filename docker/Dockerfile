@@ -38,7 +38,7 @@ ENTRYPOINT ["python", "-m", "src.cli"]
 CMD ["--help"]
 
 # Override entrypoint to run the MCP server instead of the CLI:
-#   docker run --rm --entrypoint python sabi-extractor -m src.mcp_server \
+#   docker run --rm --entrypoint python sabi -m src.mcp_server \
 #       --transport streamable-http --host 0.0.0.0 --port 8000
 
 FROM runtime AS dev

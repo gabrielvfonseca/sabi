@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sabi-extractor"
+name = "sabi"
 version = "0.1.0"
 description = "Extract SABI Informa company records to CSV and SQLite."
 readme = "README.md"
@@ -25,7 +25,7 @@ dev = [
 ]
 
 [project.scripts]
-sabi-extractor = "src.cli:main"
+sabi = "src.cli:main"
 sabi-mcp = "src.mcp_server:main"
 
 [tool.ruff]

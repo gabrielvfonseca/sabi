@@ -1,11 +1,11 @@
 version: "3.8"
 
 services:
-  sabi-extractor:
+  sabi:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    image: sabi-extractor:latest
+    image: sabi:latest
     environment:
       - SABI_USERNAME=${SABI_USERNAME:-}
       - SABI_PASSWORD=${SABI_PASSWORD:-}
@@ -22,7 +22,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    image: sabi-extractor:mcp
+    image: sabi:mcp
     environment:
       - SABI_USERNAME=${SABI_USERNAME:-}
       - SABI_PASSWORD=${SABI_PASSWORD:-}

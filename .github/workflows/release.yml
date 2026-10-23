@@ -36,7 +36,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: sabi-extractor/sabi-extractor
+          images: sabi/sabi
           tags: |
             type=ref,event=tag
             type=semver,pattern={{version}}
