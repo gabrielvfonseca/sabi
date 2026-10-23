@@ -20,7 +20,7 @@ import os
 from mcp.server.mcpserver import MCPServer
 
 from .embeddings import EmbeddingStore
-from .extractor import LOGIN_PAGE_URL, SEARCH_URL, SABIClient
+from .extractor import LOGIN_PAGE_URL, SABIClient
 from .models import Record
 from .utils import CSV_FIELDS, write_csv
 
@@ -39,10 +39,7 @@ def _get_client() -> SABIClient:
     if _client is None:
         username = os.environ.get("SABI_USERNAME", "")
         password = os.environ.get("SABI_PASSWORD", "")
-        _client = SABIClient(
-            login_page_url=LOGIN_PAGE_URL,
-            search_url=SEARCH_URL,
-        )
+        _client = SABIClient(login_page_url=LOGIN_PAGE_URL)
         if not _client.login(username, password):
             raise RuntimeError(
                 "SABI session setup failed — check network access or credentials"
