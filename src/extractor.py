@@ -236,8 +236,7 @@ class SABIClient:
         page = 1
         while True:
             result = self.search(query=query, page=page)
-            for record in result.records:
-                yield record
+            yield from result.records
             page += 1
             if not result.has_next:
                 break
