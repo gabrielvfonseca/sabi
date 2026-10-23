@@ -38,12 +38,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=LOGIN_PAGE_URL,
         help="Login page URL (default: %(default)s)",
     )
-    auth.add_argument(
-        "--no-login",
-        action="store_true",
-        help="Skip login; use an already-authenticated session (cookies)",
-    )
-
     out = parser.add_argument_group("output")
     out.add_argument(
         "--output",
