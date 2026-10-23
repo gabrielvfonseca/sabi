@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  sabi-extractor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: sabi-extractor:latest
+    environment:
+      - SABI_USERNAME=${SABI_USERNAME:-}
+      - SABI_PASSWORD=${SABI_PASSWORD:-}
+      - SABI_OUTPUT=/data/sabi_records.csv
+      - SABI_DB=/data/sabi_records.sqlite
+    volumes:
+      - ./data:/data
+    command: >
+      --search ""
+      --output /data/sabi_records.csv
+      --db /data/sabi_records.sqlite
