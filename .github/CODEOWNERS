@@ -1,0 +1,17 @@
+# CODEOWNERS
+
+# Global defaults.
+*       @gabrielfonseca
+
+# Source code ownership.
+/src/   @gabrielfonseca
+
+# Tests ownership.
+/tests/ @gabrielfonseca
+
+# CI/CD and configuration ownership.
+/.github/   @gabrielfonseca
+/docker/    @gabrielfonseca
+bin/        @gabrielfonseca
+pyproject.toml   @gabrielfonseca
+requirements.txt @gabrielfonseca
