@@ -85,9 +85,7 @@ class TestExtractor(unittest.TestCase):
             "</form>"
         )
         action, token = self.client._discover_login_form(html)
-        self.assertEqual(
-            action, "https://sabi.informa.es/R1/SabiInforma/SignIn"
-        )
+        self.assertEqual(action, "https://sabi.informa.es/R1/SabiInforma/SignIn")
         self.assertEqual(token, "TOKEN123")
 
 
