@@ -4,7 +4,7 @@ Extract company records from [SABI Informa](https://sabi.informa.es) to CSV and 
 
 ## Features
 
-- Authenticated two-step login to SABI Informa
+- Dual authentication: credential-based (username/password) and network/IP-based (e.g. NOVA SBE wifi)
 - Search and paginate company listings
 - Parse records into CSV (name, CIF, address, city, province, postal code, phone, activity)
 - Store records with embeddings in SQLite for similarity search
@@ -12,6 +12,7 @@ Extract company records from [SABI Informa](https://sabi.informa.es) to CSV and 
 - Optional `sentence-transformers` backend for real embeddings
 - MCP server exposing search, export, storage, and similarity search as agent tools
 - Executable `bin/` scripts for running without installation
+- Multiple MCP transports: stdio, SSE, streamable-HTTP
 
 ## Installation
 
@@ -67,6 +68,12 @@ Or over streamable-HTTP:
 
 ```bash
 sabi-mcp --transport streamable-http --port 8000
+```
+
+Or via SSE:
+
+```bash
+sabi-mcp --transport sse --port 8000
 ```
 
 Or via the executable bin script:

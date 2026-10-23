@@ -33,6 +33,8 @@ export SABI_USERNAME="your-username"
 export SABI_PASSWORD="your-password"
 ```
 
+The CLI also supports network/IP-based authentication (e.g. on NOVA SBE wifi) — just omit credentials and run on the authenticated network.
+
 ## Running the CLI
 
 ### Via the installed entry point
@@ -62,8 +64,7 @@ python /path/to/sabi --search "madrid software" \
     --output records.csv --db records.sqlite
 ```
 
-This logs in, searches for "madrid software", paginates through all
-result pages, and writes `records.csv`.
+This logs in, searches for "madrid software", paginates through all result pages, and writes `records.csv`.
 
 ## MCP server
 
@@ -77,6 +78,12 @@ Or over streamable-HTTP:
 
 ```bash
 sabi-mcp --transport streamable-http --port 8000
+```
+
+Or over SSE:
+
+```bash
+sabi-mcp --transport sse --port 8000
 ```
 
 Or via bin:
@@ -115,7 +122,6 @@ Requires `SABI_USERNAME` and `SABI_PASSWORD` environment variables.
 | `--max-pages` | no limit | Maximum number of search pages |
 | `--detail` | disabled | Fetch each detail page to enrich records (slower) |
 | `--no-embeddings` | disabled | Skip embedding generation and SQLite storage |
-| `--no-login` | disabled | Skip login; use an already-authenticated session (cookies) |
 
 ### Misc
 
@@ -126,7 +132,7 @@ Requires `SABI_USERNAME` and `SABI_PASSWORD` environment variables.
 
 ## MCP tools API specs
 
-All tools return JSON strings. Errors are returned as `{"error": "..."}`.
+All tools return JSON strings. Errors are returned as `{"error": "..."}` or `{"status": "error", "error": "..."}`.
 
 ### sabi_login
 
