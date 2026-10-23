@@ -87,11 +87,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip embedding generation and SQLite storage",
     )
-    src.add_argument(
-        "--no-login",
-        action="store_true",
-        help="Skip login; use an already-authenticated session (cookies)",
-    )
 
     misc = parser.add_argument_group("misc")
     misc.add_argument("--timeout", type=int, default=30, help="HTTP timeout in seconds")
