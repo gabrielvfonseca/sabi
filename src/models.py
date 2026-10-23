@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any
 
 
 @dataclass
@@ -72,6 +71,7 @@ class Record:
             val = row.get(key)
             if val:
                 import json
+
                 row[key] = json.dumps(val, ensure_ascii=False)
         row.pop("extras", None)
         row.update(self.extras)
