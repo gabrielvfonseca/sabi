@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from collections.abc import Iterable
@@ -73,7 +72,9 @@ class SABIClient:
         if not username and not password:
             return self._login_network()
 
-        raise NotImplementedError("Credential-based login not yet implemented for new site")
+        raise NotImplementedError(
+            "Credential-based login not yet implemented for new site"
+        )
 
     def _login_network(self) -> bool:
         """Establish an IP/network-authenticated session without credentials."""
@@ -152,8 +153,12 @@ class SABIClient:
         )
         data["tbSearch"] = query
         data["ContentContainer1$ctl00$Header$ctl00$ctl03$SearchText2008"] = query
-        data["ContentContainer1$ctl00$Header$ctl00$ctl03$IdConversionPopupAction"] = "Open"
-        data["ContentContainer1$ctl00$Content$QuickSearch1$ctl02$PanelSelected"] = "TabAdvancedSearches"
+        data["ContentContainer1$ctl00$Header$ctl00$ctl03$IdConversionPopupAction"] = (
+            "Open"
+        )
+        data["ContentContainer1$ctl00$Content$QuickSearch1$ctl02$PanelSelected"] = (
+            "TabAdvancedSearches"
+        )
 
         resp = self.session.post(search_url, data=data, timeout=self.timeout)
         resp.raise_for_status()
@@ -196,7 +201,11 @@ class SABIClient:
         rows = table.find_all("tr")
         for row in rows[1:]:
             record = self._parse_result_row(row, page_url)
-            if record.name and record.name not in ("Nombre", "Localidad", "Nombre empresa"):
+            if record.name and record.name not in (
+                "Nombre",
+                "Localidad",
+                "Nombre empresa",
+            ):
                 records.append(record)
 
         return records
@@ -228,7 +237,7 @@ class SABIClient:
         # Cell indices based on actual list table structure
         # Cell 0: empty/row number
         # Cell 4: first link (setMark)
-        # Cell 6: second link (NoteLink) 
+        # Cell 6: second link (NoteLink)
         # Cell 8: company name link (listContentClicked with SeqNr)
         # Cell 10: CIF
         # Cell 12: City
@@ -243,7 +252,9 @@ class SABIClient:
         detail_url = cell_link(8)
         onclick = cell_onclick(8)
         seqnr = ""
-        match = re.search(r"Report\.serv\?_CID=\d+&product=sabiinforma&SeqNr=(\d+)", onclick)
+        match = re.search(
+            r"Report\.serv\?_CID=\d+&product=sabiinforma&SeqNr=(\d+)", onclick
+        )
         if match:
             seqnr = match.group(1)
 
@@ -273,11 +284,18 @@ class SABIClient:
 
     def get_record(self, detail_url: str, seqnr: str = "") -> Record:
         """Fetch and parse a company detail/report page."""
-        is_list_url = not detail_url or detail_url.startswith("#") or "Scripts/List/#" in detail_url or "List.serv" in detail_url
+        is_list_url = (
+            not detail_url
+            or detail_url.startswith("#")
+            or "Scripts/List/#" in detail_url
+            or "List.serv" in detail_url
+        )
         if is_list_url:
             if seqnr:
                 base = urljoin(self.base_url, self.version_prefix)
-                detail_url = urljoin(base, f"/Report.serv?_CID=136&product=sabiinforma&SeqNr={seqnr}")
+                detail_url = urljoin(
+                    base, f"/Report.serv?_CID=136&product=sabiinforma&SeqNr={seqnr}"
+                )
             else:
                 detail_url = self._resolve_detail_url(detail_url)
         resp = self.session.get(detail_url, timeout=self.timeout)
@@ -290,7 +308,9 @@ class SABIClient:
         if match:
             seqnr = match.group(1)
             base = urljoin(self.base_url, self.version_prefix)
-            return urljoin(base, f"/Report.serv?_CID=136&product=sabiinforma&SeqNr={seqnr}")
+            return urljoin(
+                base, f"/Report.serv?_CID=136&product=sabiinforma&SeqNr={seqnr}"
+            )
         return list_url
 
     def _parse_detail_page(self, html: str, detail_url: str) -> Record:
@@ -298,7 +318,7 @@ class SABIClient:
         text = soup.get_text()
         # Replace non-breaking spaces
         text = text.replace("\xa0", " ")
-        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
 
         record = Record(detail_url=detail_url)
 
@@ -327,18 +347,34 @@ class SABIClient:
                     if match:
                         record.cif = match.group(1)
                 if "Fecha últimas cuentas" in line and not record.latest_year:
-                    match = re.search(r"Fecha últimas cuentas\s*(\d{2}/\d{2}/\d{4})", line)
+                    match = re.search(
+                        r"Fecha últimas cuentas\s*(\d{2}/\d{2}/\d{4})", line
+                    )
                     if match:
                         record.latest_year = match.group(1)
                 if "Global Ultimate Owner" in line and not record.global_ultimate_owner:
-                    record.global_ultimate_owner = clean(line.split("Global Ultimate Owner")[-1].split("Código")[0])
+                    record.global_ultimate_owner = clean(
+                        line.split("Global Ultimate Owner")[-1].split("Código")[0]
+                    )
 
             # Contact info section (street, postal+city, province, country, email)
             elif "Información de contacto" in line:
                 # Parse following lines for address components
                 addr_parts = []
                 for j in range(i + 1, min(i + 6, len(lines))):
-                    if lines[j] and not any(kw in lines[j].lower() for kw in ["email", "tel", "fax", "web", "información", "forma jurídica", "capital", "fecha"]):
+                    if lines[j] and not any(
+                        kw in lines[j].lower()
+                        for kw in [
+                            "email",
+                            "tel",
+                            "fax",
+                            "web",
+                            "información",
+                            "forma jurídica",
+                            "capital",
+                            "fecha",
+                        ]
+                    ):
                         addr_parts.append(lines[j])
                 if addr_parts:
                     record.address = clean(" | ".join(addr_parts))
@@ -350,16 +386,24 @@ class SABIClient:
             elif "Teléfono" in line and not record.phone:
                 record.phone = clean(line.split("Teléfono")[-1].split("Fax")[0])
             elif "Fax" in line and "Dirección web" not in line:
-                record.extras["fax"] = clean(line.split("Fax")[-1].split("Dirección")[0].split("web")[0])
+                record.extras["fax"] = clean(
+                    line.split("Fax")[-1].split("Dirección")[0].split("web")[0]
+                )
             elif "Dirección web" in line or ("www." in line and not record.website):
                 match = re.search(r"(https?://\S+|www\.\S+)", line)
                 if match:
                     record.website = match.group(1)
                 else:
-                    record.website = clean(line.split("Dirección web")[-1].split("Información")[0])
+                    record.website = clean(
+                        line.split("Dirección web")[-1].split("Información")[0]
+                    )
 
             # Legal info
-            elif "Forma jurídica" in line and "detallada" not in line and not record.legal_form:
+            elif (
+                "Forma jurídica" in line
+                and "detallada" not in line
+                and not record.legal_form
+            ):
                 match = re.search(r"Forma jurídica\s*(.+)", line)
                 if match:
                     record.legal_form = clean(match.group(1))
@@ -371,10 +415,23 @@ class SABIClient:
                 match = re.search(r"Capital social\s*\(?[\w\s]*\)?\s*([\d\.]+)", line)
                 if match:
                     record.share_capital = match.group(1)
-            elif "Estado" in line and "detallado" not in line and line.startswith("Estado") and not record.status:
-                record.status = clean(line.split("Estado")[-1].split()[0] if line.split("Estado")[-1].split() else "")
-            elif ("Ultimo año disponible" in line or "Último año disponible" in line) and not record.latest_year:
-                match = re.search(r"(?:Ultimo|Último) año disponible\s*(\d{2}/\d{2}/\d{4})", line)
+            elif (
+                "Estado" in line
+                and "detallado" not in line
+                and line.startswith("Estado")
+                and not record.status
+            ):
+                record.status = clean(
+                    line.split("Estado")[-1].split()[0]
+                    if line.split("Estado")[-1].split()
+                    else ""
+                )
+            elif (
+                "Ultimo año disponible" in line or "Último año disponible" in line
+            ) and not record.latest_year:
+                match = re.search(
+                    r"(?:Ultimo|Último) año disponible\s*(\d{2}/\d{2}/\d{4})", line
+                )
                 if match:
                     record.latest_year = match.group(1)
             elif "Años disponibles" in line and not record.available_years:
@@ -388,7 +445,9 @@ class SABIClient:
                 if match:
                     record.revenue = match.group(1)
                 elif i + 1 < len(lines):
-                    record.revenue = clean(lines[i + 1].split()[0] if lines[i + 1].split() else "")
+                    record.revenue = clean(
+                        lines[i + 1].split()[0] if lines[i + 1].split() else ""
+                    )
             elif "Resultado ejercicio" in line and not record.profit:
                 match = re.search(r"Resultado ejercicio\s*([\d\.\-]+)", line)
                 if match:
@@ -408,7 +467,9 @@ class SABIClient:
 
             # Global Ultimate Owner
             elif "Global Ultimate Owner" in line and not record.global_ultimate_owner:
-                record.global_ultimate_owner = clean(line.split("Global Ultimate Owner")[-1].split("Código")[0])
+                record.global_ultimate_owner = clean(
+                    line.split("Global Ultimate Owner")[-1].split("Código")[0]
+                )
 
             # Directors - handle concatenated "Director ejecutivoName" format
             elif "Director ejecutivo" in line or "Presidente" in line:
@@ -428,10 +489,32 @@ class SABIClient:
                     name = clean(lines[i + 1])
 
                 # Validate
-                if (name and not name.startswith("P426") and 
-                    not any(kw in name for kw in ["El director", "ocupa posiciones", "sólo en esta", "Información", "grupo", "tamaño", "Indicador", "Independencia"])):
+                if (
+                    name
+                    and not name.startswith("P426")
+                    and not any(
+                        kw in name
+                        for kw in [
+                            "El director",
+                            "ocupa posiciones",
+                            "sólo en esta",
+                            "Información",
+                            "grupo",
+                            "tamaño",
+                            "Indicador",
+                            "Independencia",
+                        ]
+                    )
+                ):
                     name = name.replace("Don ", "").replace("Doña ", "")
-                    record.directors.append({"name": name, "role": "Director ejecutivo" if "Director ejecutivo" in line else "Presidente"})
+                    record.directors.append(
+                        {
+                            "name": name,
+                            "role": "Director ejecutivo"
+                            if "Director ejecutivo" in line
+                            else "Presidente",
+                        }
+                    )
             elif "Sócio Gerente" in line or ("Sócio" in line and "Gerente" in line):
                 name = ""
                 match = re.search(r"Sócio Gerente\s*(.+)", line)
@@ -443,12 +526,18 @@ class SABIClient:
                     record.directors.append({"name": name, "role": "Sócio Gerente"})
 
             # Activity/CAE
-            elif "Descripción actividad" in line and i + 1 < len(lines) and not record.activity:
+            elif (
+                "Descripción actividad" in line
+                and i + 1 < len(lines)
+                and not record.activity
+            ):
                 record.activity = clean(lines[i + 1])
             elif "Código(s) CAE" in line or "Código(s) primario" in line:
                 cae_match = re.search(r"(\d{5})\s*[-:]\s*([^C]+)", line)
                 if cae_match:
-                    record.primary_cae = f"{cae_match.group(1)} - {clean(cae_match.group(2))}"
+                    record.primary_cae = (
+                        f"{cae_match.group(1)} - {clean(cae_match.group(2))}"
+                    )
 
             # Last update
             elif "Última actualización" in line and not record.last_update:
@@ -472,87 +561,210 @@ class SABIClient:
         if len(line) < 5 or line.isdigit():
             return False
         # Must contain typical company suffixes
-        company_suffixes = ["LDA", "SLU", "SL", "SA", "S.A.", "S.L.", "S.L.U.", 
-                            "S.A.U.", "LTD", "LIMITED", "INC", "CORP", "GMBH",
-                            "PTY", "BV", "NV", "AG", "SE", "SCA", "SCS", "SAS",
-                            "UNIPESSOAL", "UNIPERSONAL"]
+        company_suffixes = [
+            "LDA",
+            "SLU",
+            "SL",
+            "SA",
+            "S.A.",
+            "S.L.",
+            "S.L.U.",
+            "S.A.U.",
+            "LTD",
+            "LIMITED",
+            "INC",
+            "CORP",
+            "GMBH",
+            "PTY",
+            "BV",
+            "NV",
+            "AG",
+            "SE",
+            "SCA",
+            "SCS",
+            "SAS",
+            "UNIPESSOAL",
+            "UNIPERSONAL",
+        ]
         has_suffix = any(suffix in line.upper() for suffix in company_suffixes)
         if not has_suffix:
             return False
-        skip_kws = ["Nombre", "director", "Nueva", "Suprimir", "Agregar", "Alertas", 
-                    "Exportaciones", "Búsquedas", "Listas", "Informes", "Accionistas", 
-                    "Análisis", "Configuración", "Grupos", "Secciones", "Ratios", 
-                    "Datos", "Campos", "Plantillas", "Ayuda", "Herramientas", "Web", 
-                    "Contact", "Cerrar", "Inicio", "Ocultar", "Volver", "Buscar", 
-                    "Modificar", "Definir", "Formato", "Crear", "Añadir", "Mostrar", 
-                    "Plantilla", "Title", "de", "Informe", "Grupo", "Mapa", "Editar", 
-                    "Secciones", "Avíseme", "Exportar", "Enviar", "Imprimir",
-                    "Secciones", "Opciones", "Spanish", "Portuguese", "companies",
-                    "Empresas", "Contactos", "Noticias", "Alertas", "Búsquedas",
-                    "Mis", "Cuenta", "Idioma", "Preferencias", "Impresora", "Envío",
-                    "Consistencia", "Exportaciones", "Búsquedas", "Listas", "Accionistas",
-                    "Análisis", "Comparación", "Personalizadas", "Ratios", "Importados",
-                    "PowerPoint", "Cobertura", "Guía", "Manual", "Herramientas",
-                    "Add-in", "Verificar", "VAT", "Cerrar", "Sesión", "Ocultar",
-                    "Volver", "Buscar", "Modificar", "Definir", "Nuevo", "Añadir",
-                    "Quitar", "Crear", "Plantilla", "Title", "Mapa", "Editar",
-                    "Avíseme", "Enviar", "Imprimir", "Tu", "template", "is", "invalid",
-                    "Sección", "Opciones", "Personalizada", "Definición", "Matriz",
-                    "Cancelar", "Aceptar", "Sí", "No", "Atrás", "Siguiente",
-                    "Guardar", "Eliminar", "Editar", "Ver", "Detalle", "Lista"]
+        skip_kws = [
+            "Nombre",
+            "director",
+            "Nueva",
+            "Suprimir",
+            "Agregar",
+            "Alertas",
+            "Exportaciones",
+            "Búsquedas",
+            "Listas",
+            "Informes",
+            "Accionistas",
+            "Análisis",
+            "Configuración",
+            "Grupos",
+            "Secciones",
+            "Ratios",
+            "Datos",
+            "Campos",
+            "Plantillas",
+            "Ayuda",
+            "Herramientas",
+            "Web",
+            "Contact",
+            "Cerrar",
+            "Inicio",
+            "Ocultar",
+            "Volver",
+            "Buscar",
+            "Modificar",
+            "Definir",
+            "Formato",
+            "Crear",
+            "Añadir",
+            "Mostrar",
+            "Plantilla",
+            "Title",
+            "de",
+            "Informe",
+            "Grupo",
+            "Mapa",
+            "Editar",
+            "Secciones",
+            "Avíseme",
+            "Exportar",
+            "Enviar",
+            "Imprimir",
+            "Secciones",
+            "Opciones",
+            "Spanish",
+            "Portuguese",
+            "companies",
+            "Empresas",
+            "Contactos",
+            "Noticias",
+            "Alertas",
+            "Búsquedas",
+            "Mis",
+            "Cuenta",
+            "Idioma",
+            "Preferencias",
+            "Impresora",
+            "Envío",
+            "Consistencia",
+            "Exportaciones",
+            "Búsquedas",
+            "Listas",
+            "Accionistas",
+            "Análisis",
+            "Comparación",
+            "Personalizadas",
+            "Ratios",
+            "Importados",
+            "PowerPoint",
+            "Cobertura",
+            "Guía",
+            "Manual",
+            "Herramientas",
+            "Add-in",
+            "Verificar",
+            "VAT",
+            "Cerrar",
+            "Sesión",
+            "Ocultar",
+            "Volver",
+            "Buscar",
+            "Modificar",
+            "Definir",
+            "Nuevo",
+            "Añadir",
+            "Quitar",
+            "Crear",
+            "Plantilla",
+            "Title",
+            "Mapa",
+            "Editar",
+            "Avíseme",
+            "Enviar",
+            "Imprimir",
+            "Tu",
+            "template",
+            "is",
+            "invalid",
+            "Sección",
+            "Opciones",
+            "Personalizada",
+            "Definición",
+            "Matriz",
+            "Cancelar",
+            "Aceptar",
+            "Sí",
+            "No",
+            "Atrás",
+            "Siguiente",
+            "Guardar",
+            "Eliminar",
+            "Editar",
+            "Ver",
+            "Detalle",
+            "Lista",
+        ]
         return not any(kw in line for kw in skip_kws)
 
     def _is_address_line(self, line: str) -> bool:
         """Check if a line contains address/postal code info."""
         # Spanish: 5 digits, Portuguese: 4 digits + hyphen + 3 digits
-        return bool(re.search(r"\d{4,5}(?:-\d{3})?[\s\xa0]+\w+", line)) and "Código NIF" in line
+        return (
+            bool(re.search(r"\d{4,5}(?:-\d{3})?[\s\xa0]+\w+", line))
+            and "Código NIF" in line
+        )
+
     def _parse_address_components(self, record: Record) -> None:
-            """Parse address string into components."""
-            addr = record.address
+        """Parse address string into components."""
+        addr = record.address
 
-            # Try Portuguese format first: split by | and find postal code + city
-            parts = [p.strip() for p in addr.split("|")]
-            for part in parts:
-                match = re.search(r"(\d{4}-\d{3})[\s ]+(\w+)", part)
-                if match:
-                    record.postal_code = match.group(1)
-                    record.city = match.group(2)
-                    break
-
-            # Try Spanish format: "28660 BOADILLA DEL MONTE (MADRID, ESPANA)..."
-            if not record.postal_code:
-                match = re.search(r"(\d{4,5}(?:-\d{3})?)[\s ]+([^\(]+)", addr)
-                if match:
-                    record.postal_code = match.group(1)
-                    record.city = clean(match.group(2))
-
-            # Extract country from parentheses (Spanish format)
-            match = re.search(r"\(([^)]+)\)", addr)
+        # Try Portuguese format first: split by | and find postal code + city
+        parts = [p.strip() for p in addr.split("|")]
+        for part in parts:
+            match = re.search(r"(\d{4}-\d{3})[\s ]+(\w+)", part)
             if match:
-                location = match.group(1)
-                if "," in location:
-                    parts = [p.strip() for p in location.split(",")]
-                    if not record.city:
-                        record.city = parts[0] if parts else ""
-                    record.country = parts[1] if len(parts) > 1 else ""
-                else:
-                    record.country = location
+                record.postal_code = match.group(1)
+                record.city = match.group(2)
+                break
 
-            # Try Portuguese pipe-separated format for country
-            if not record.country and "|" in addr:
-                parts = [p.strip() for p in addr.split("|")]
-                if len(parts) >= 3:
-                    if not record.city:
-                        record.city = parts[-2]  # Second to last is usually city
-                    record.country = parts[-1]   # Last is usually country
+        # Try Spanish format: "28660 BOADILLA DEL MONTE (MADRID, ESPANA)..."
+        if not record.postal_code:
+            match = re.search(r"(\d{4,5}(?:-\d{3})?)[\s ]+([^\(]+)", addr)
+            if match:
+                record.postal_code = match.group(1)
+                record.city = clean(match.group(2))
 
-            # Try to extract email from address if embedded
-            if not record.email:
-                email_match = re.search(r"[\w\.-]+@[\w\.-]+", addr)
-                if email_match:
-                    record.email = email_match.group(0)
+        # Extract country from parentheses (Spanish format)
+        match = re.search(r"\(([^)]+)\)", addr)
+        if match:
+            location = match.group(1)
+            if "," in location:
+                parts = [p.strip() for p in location.split(",")]
+                if not record.city:
+                    record.city = parts[0] if parts else ""
+                record.country = parts[1] if len(parts) > 1 else ""
+            else:
+                record.country = location
 
+        # Try Portuguese pipe-separated format for country
+        if not record.country and "|" in addr:
+            parts = [p.strip() for p in addr.split("|")]
+            if len(parts) >= 3:
+                if not record.city:
+                    record.city = parts[-2]  # Second to last is usually city
+                record.country = parts[-1]  # Last is usually country
 
+        # Try to extract email from address if embedded
+        if not record.email:
+            email_match = re.search(r"[\w\.-]+@[\w\.-]+", addr)
+            if email_match:
+                record.email = email_match.group(0)
 
     def _extract_financial_tables(self, soup: BeautifulSoup, record: Record) -> None:
         """Extract multi-year financial data from report tables."""
@@ -564,7 +776,17 @@ class SABIClient:
 
             # Check for financial table headers
             header_text = clean(rows[0].get_text(" ", strip=True))
-            if any(kw in header_text for kw in ["31/12/", "EUR", "Ingresos", "Resultado", "Activo", "Fondos propios"]):
+            if any(
+                kw in header_text
+                for kw in [
+                    "31/12/",
+                    "EUR",
+                    "Ingresos",
+                    "Resultado",
+                    "Activo",
+                    "Fondos propios",
+                ]
+            ):
                 # Extract year columns
                 years = []
                 for cell in rows[0].find_all(["td", "th"]):
@@ -581,25 +803,54 @@ class SABIClient:
                     values = [clean(c.get_text(" ", strip=True)) for c in cells[1:]]
 
                     if "Ingresos de explotación" in label or "Cifra de Ventas" in label:
-                        record.financial_history["revenue"] = dict(zip(years, values))
-                    elif "Resultado del Ejercicio" in label or "Resultado ejercicio" in label:
-                        record.financial_history["profit"] = dict(zip(years, values))
+                        record.financial_history["revenue"] = dict(
+                            zip(years, values, strict=False)
+                        )
+                    elif (
+                        "Resultado del Ejercicio" in label
+                        or "Resultado ejercicio" in label
+                    ):
+                        record.financial_history["profit"] = dict(
+                            zip(years, values, strict=False)
+                        )
                     elif "Total activo" in label or "Total Activo" in label:
-                        record.financial_history["total_assets"] = dict(zip(years, values))
+                        record.financial_history["total_assets"] = dict(
+                            zip(years, values, strict=False)
+                        )
                     elif "Fondos propios" in label:
-                        record.financial_history["equity"] = dict(zip(years, values))
+                        record.financial_history["equity"] = dict(
+                            zip(years, values, strict=False)
+                        )
                     elif "Número empleados" in label or "Número de empleados" in label:
-                        record.financial_history["employees"] = dict(zip(years, values))
+                        record.financial_history["employees"] = dict(
+                            zip(years, values, strict=False)
+                        )
 
                 # Extract ratios
                 for row in rows:
                     cells = row.find_all(["td", "th"])
                     if len(cells) >= 2:
                         label = clean(cells[0].get_text(" ", strip=True))
-                        if any(kw in label for kw in ["Rentabilidad", "Liquidez", "Endeudamiento", "Rotación", "Margen", "Cobertura", "Solvencia", "Apalancamiento"]):
-                            values = [clean(c.get_text(" ", strip=True)) for c in cells[1:]]
+                        if any(
+                            kw in label
+                            for kw in [
+                                "Rentabilidad",
+                                "Liquidez",
+                                "Endeudamiento",
+                                "Rotación",
+                                "Margen",
+                                "Cobertura",
+                                "Solvencia",
+                                "Apalancamiento",
+                            ]
+                        ):
+                            values = [
+                                clean(c.get_text(" ", strip=True)) for c in cells[1:]
+                            ]
                             if years and len(values) == len(years):
-                                record.ratios[label] = dict(zip(years, values))
+                                record.ratios[label] = dict(
+                                    zip(years, values, strict=False)
+                                )
 
     def iter_search(
         self,
