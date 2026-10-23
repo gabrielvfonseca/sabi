@@ -11,15 +11,47 @@ from typing import Any
 from .models import Record
 
 CSV_FIELDS = [
+    # Identity
     "name",
     "cif",
+    "bvd_id",
+    "legal_form",
+    "incorporation_date",
+    "status",
+    # Contact
     "address",
     "city",
     "province",
     "postal_code",
+    "country",
+    "email",
     "phone",
+    "website",
+    # Activity
     "activity",
+    "primary_cae",
+    "secondary_cae",
+    # Financials (latest)
+    "latest_year",
+    "revenue",
+    "profit",
+    "total_assets",
+    "equity",
+    "employees",
+    "share_capital",
+    # People (JSON)
+    "directors",
+    "auditors",
+    # Ownership (JSON)
+    "shareholders",
+    "global_ultimate_owner",
+    "subsidiaries",
+    "group_companies_count",
+    # Metadata
     "detail_url",
+    "last_update",
+    "consolidation_type",
+    "available_years",
 ]
 
 
