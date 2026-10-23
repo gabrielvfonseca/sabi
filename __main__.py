@@ -2,7 +2,7 @@
 
 Allows running the project directory directly:
 
-    python /path/to/sabi-extrator --search "madrid software"
+    python /path/to/sabi --search "madrid software"
 
 Equivalent to `python -m src.cli` or the `sabi` console script.
 """

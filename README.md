@@ -47,7 +47,7 @@ sabi --search "madrid software" \
 ### Run via root `__main__.py`
 
 ```bash
-python /path/to/sabi-extrator --search "madrid software" \
+python /path/to/sabi --search "madrid software" \
     --output records.csv --db records.sqlite
 ```
 
