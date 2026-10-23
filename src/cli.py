@@ -16,7 +16,7 @@ logger = logging.getLogger("sabi_extractor")
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="sabi-extractor",
+        prog="sabi",
         description="Extract SABI Informa company records to CSV and SQLite.",
     )
 

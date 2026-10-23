@@ -25,7 +25,7 @@ from .models import Record
 from .utils import CSV_FIELDS, write_csv
 
 server = MCPServer(
-    name="sabi-extractor",
+    name="sabi",
     instructions="Extract company records from SABI Informa (sabi.informa.es). "
     "Set SABI_USERNAME and SABI_PASSWORD environment variables to authenticate.",
 )

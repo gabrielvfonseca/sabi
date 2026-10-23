@@ -65,7 +65,7 @@ class SABIClient:
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "User-Agent": "Mozilla/5.0 (compatible; sabi-extractor/1.0; +https://sabi.informa.es/)",
+                "User-Agent": "Mozilla/5.0 (compatible; sabi/1.0; +https://sabi.informa.es/)",
                 "Accept": "text/html,application/xhtml+xml",
                 "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
             }
