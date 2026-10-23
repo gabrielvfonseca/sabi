@@ -111,20 +111,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         timeout=args.timeout,
     )
 
-    if not args.no_login:
-        logger.info("establishing session with SABI Informa")
-        try:
-            ok = client.login(args.username or "", args.password or "")
-        except Exception as exc:  # noqa: BLE001
-            logger.error("session setup failed: %s", exc)
-            return 1
-        if not ok:
-            logger.error("session setup failed: could not authenticate")
-            return 1
-        logger.info("session established")
-    else:
-        client.authenticated = True
-        logger.info("skipping login; using existing session")
+    logger.info("establishing session with SABI Informa")
+    try:
+        ok = client.login(args.username or "", args.password or "")
+    except Exception as exc:  # noqa: BLE001
+        logger.error("session setup failed: %s", exc)
+        return 1
+    if not ok:
+        logger.error("session setup failed: could not authenticate")
+        return 1
+    logger.info("session established")
 
     logger.info("searching%s", f" for '{args.search}'" if args.search else "")
 
