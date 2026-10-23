@@ -227,7 +227,11 @@ class SABIClient:
     # ------------------------------------------------------------------ #
     # pagination helper
     # ------------------------------------------------------------------ #
-    def iter_search(self, query: str = "", max_pages: int | None = None) -> Iterable[Record]:
+    def iter_search(
+        self,
+        query: str = "",
+        max_pages: int | None = None,
+    ) -> Iterable[Record]:
         """Yield records across search pages until exhaustion or max_pages."""
         page = 1
         while True:
