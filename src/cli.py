@@ -8,7 +8,7 @@ import os
 from collections.abc import Sequence
 
 from .embeddings import EmbeddingStore
-from .extractor import LOGIN_PAGE_URL, SEARCH_URL, SABIClient
+from .extractor import LOGIN_PAGE_URL, SABIClient
 from .utils import CSV_FIELDS, write_csv
 
 logger = logging.getLogger("sabi_extractor")
@@ -61,11 +61,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--search", "-q", default="", help="Search query to run after login"
     )
     src.add_argument(
-        "--search-url",
-        default=SEARCH_URL,
-        help="Search results URL (default: %(default)s)",
-    )
-    src.add_argument(
         "--max-pages",
         type=int,
         default=None,
@@ -107,7 +102,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     client = SABIClient(
         login_page_url=args.login_page_url,
-        search_url=args.search_url,
         timeout=args.timeout,
     )
 
@@ -128,7 +122,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         records = []
         for record in client.iter_search(query=args.search, max_pages=args.max_pages):
             if args.detail and record.detail_url:
-                record = client.get_record(record.detail_url)
+                seqnr = record.extras.get("seqnr", "") if record.extras else ""
+                record = client.get_record(record.detail_url, seqnr)
             records.append(record)
     except Exception as exc:  # noqa: BLE001
         logger.error("extraction failed: %s", exc)
