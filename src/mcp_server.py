@@ -37,18 +37,16 @@ _store: EmbeddingStore | None = None
 def _get_client() -> SABIClient:
     global _client
     if _client is None:
-        username = os.environ.get("SABI_USERNAME")
-        password = os.environ.get("SABI_PASSWORD")
-        if not username or not password:
-            raise RuntimeError(
-                "SABI_USERNAME and SABI_PASSWORD environment variables are required"
-            )
+        username = os.environ.get("SABI_USERNAME", "")
+        password = os.environ.get("SABI_PASSWORD", "")
         _client = SABIClient(
             login_page_url=LOGIN_PAGE_URL,
             search_url=SEARCH_URL,
         )
         if not _client.login(username, password):
-            raise RuntimeError("SABI login failed — check credentials")
+            raise RuntimeError(
+                "SABI session setup failed — check network access or credentials"
+            )
     return _client
 
 

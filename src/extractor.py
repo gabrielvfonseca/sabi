@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
-import requests
+import requests  # type: ignore[import-untyped]
 from bs4 import BeautifulSoup
 
 from .models import Record
@@ -76,14 +76,22 @@ class SABIClient:
     # ------------------------------------------------------------------ #
     # authentication
     # ------------------------------------------------------------------ #
-    def login(self, username: str, password: str) -> bool:
-        """Perform the two-step SABI login (username, then password).
+    def login(self, username: str = "", password: str = "") -> bool:
+        """Authenticate with SABI Informa.
 
-        The form action and anti-forgery token are discovered dynamically
-        from the login page so the client adapts to versioned paths.
+        Supports two modes:
+        - Credential flow: two-step username/password POST when *username* and
+          *password* are provided.
+        - Network/IP flow: when no credentials are given, establish the
+          session by fetching the login and search pages. Useful behind an
+          IP-authenticated network (e.g. university wifi) that recognizes
+          your address and lets you in without a password.
 
         Returns True if authentication appears to have succeeded.
         """
+        if not username and not password:
+            return self._login_network()
+
         resp = self.session.get(self.login_page_url, timeout=self.timeout)
         resp.raise_for_status()
         self.login_action_url, token = self._discover_login_form(resp.text)
@@ -115,6 +123,27 @@ class SABIClient:
         self.authenticated = self._is_authenticated(resp)
         return self.authenticated
 
+    def _login_network(self) -> bool:
+        """Establish an IP/network-authenticated session without credentials.
+
+        Useful when behind a network (e.g. university wifi) that
+        authenticates by IP address. We fetch the login page and search
+        page to set up session cookies, then consider ourselves
+        authenticated.
+        """
+        logger.info("using network/IP authentication (no credentials provided)")
+        # Fetch login page to establish session cookies via IP auth.
+        resp = self.session.get(self.login_page_url, timeout=self.timeout)
+        resp.raise_for_status()
+
+        # Probe the search page to confirm network access and finalize
+        # the session.
+        resp = self.session.get(self.search_url, timeout=self.timeout)
+        resp.raise_for_status()
+
+        self.authenticated = self._is_authenticated(resp)
+        return self.authenticated
+
     def _base_form_data(self, token: str) -> dict:
         return {
             "__RequestVerificationToken": token,
@@ -129,12 +158,12 @@ class SABIClient:
         soup = BeautifulSoup(html, "html.parser")
         form = soup.find("form", id="LoginForm") or soup.find("form")
         action = form.get("action") if form else None
-        action_url = urljoin(BASE_URL, action) if action else None
+        action_url = urljoin(BASE_URL, str(action)) if action else None
         token = None
         if form:
             tag = form.find("input", {"name": "__RequestVerificationToken"})
             if tag and tag.get("value"):
-                token = tag["value"]
+                token = str(tag["value"])
         return action_url, token
 
     @staticmethod
@@ -142,7 +171,7 @@ class SABIClient:
         soup = BeautifulSoup(html, "html.parser")
         tag = soup.find("input", {"name": "__RequestVerificationToken"})
         if tag and tag.get("value"):
-            return tag["value"]
+            return str(tag["value"])
         return None
 
     def _is_authenticated(self, resp: requests.Response) -> bool:

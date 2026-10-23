@@ -40,7 +40,7 @@ class EmbeddingStore:
     def _load_embedder(self):
         """Prefer sentence-transformers; fall back to a deterministic hash."""
         try:  # pragma: no cover - optional dependency
-            from sentence_transformers import SentenceTransformer
+            from sentence_transformers import SentenceTransformer  # type: ignore[import-not-found]  # noqa: I001
 
             model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -124,9 +124,7 @@ class EmbeddingStore:
             "activity, detail_url FROM records"
         )
         columns = [d[0] for d in cur.description]
-        return [
-            dict(zip(columns, row, strict=False)) for row in cur.fetchall()
-        ]
+        return [dict(zip(columns, row, strict=False)) for row in cur.fetchall()]
 
     def search_similar(self, query: str, limit: int = 10) -> list[dict]:
         """Return records ordered by cosine similarity to *query* (SQLite fallback).
@@ -151,12 +149,17 @@ class EmbeddingStore:
 
         scored.sort(key=lambda x: x[0], reverse=True)
         columns = [
-            "cif", "name", "address", "city", "province", "postal_code",
-            "phone", "activity", "detail_url",
+            "cif",
+            "name",
+            "address",
+            "city",
+            "province",
+            "postal_code",
+            "phone",
+            "activity",
+            "detail_url",
         ]
-        return [
-            dict(zip(columns, row, strict=False)) for _, row in scored[:limit]
-        ]
+        return [dict(zip(columns, row, strict=False)) for _, row in scored[:limit]]
 
     def close(self) -> None:
         self._conn.close()

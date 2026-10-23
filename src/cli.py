@@ -21,40 +21,86 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     auth = parser.add_argument_group("authentication")
-    auth.add_argument("--username", default=os.environ.get("SABI_USERNAME"),
-                      help="SABI Informa username (env: SABI_USERNAME)")
-    auth.add_argument("--password", default=os.environ.get("SABI_PASSWORD"),
-                      help="SABI Informa password (env: SABI_PASSWORD)")
-    auth.add_argument("--login-page-url", default=LOGIN_PAGE_URL,
-                      help="Login page URL (default: %(default)s)")
+    auth.add_argument(
+        "--username",
+        default=os.environ.get("SABI_USERNAME"),
+        help="SABI Informa username (env: SABI_USERNAME; "
+        "optional on IP-authenticated networks)",
+    )
+    auth.add_argument(
+        "--password",
+        default=os.environ.get("SABI_PASSWORD"),
+        help="SABI Informa password (env: SABI_PASSWORD; "
+        "optional on IP-authenticated networks)",
+    )
+    auth.add_argument(
+        "--login-page-url",
+        default=LOGIN_PAGE_URL,
+        help="Login page URL (default: %(default)s)",
+    )
+    auth.add_argument(
+        "--no-login",
+        action="store_true",
+        help="Skip login; use an already-authenticated session (cookies)",
+    )
 
     out = parser.add_argument_group("output")
-    out.add_argument("--output", "-o", default="sabi_records.csv",
-                     help="Output CSV path (default: sabi_records.csv)")
-    out.add_argument("--fields", default=",".join(CSV_FIELDS),
-                     help="Comma-separated CSV fields (default: all standard fields)")
-    out.add_argument("--db", default="sabi_records.sqlite",
-                     help="SQLite database path (default: sabi_records.sqlite)")
+    out.add_argument(
+        "--output",
+        "-o",
+        default="sabi_records.csv",
+        help="Output CSV path (default: sabi_records.csv)",
+    )
+    out.add_argument(
+        "--fields",
+        default=",".join(CSV_FIELDS),
+        help="Comma-separated CSV fields (default: all standard fields)",
+    )
+    out.add_argument(
+        "--db",
+        default="sabi_records.sqlite",
+        help="SQLite database path (default: sabi_records.sqlite)",
+    )
 
     src = parser.add_argument_group("source")
-    src.add_argument("--search", "-q", default="",
-                     help="Search query to run after login")
-    src.add_argument("--search-url", default=SEARCH_URL,
-                     help="Search results URL (default: %(default)s)")
-    src.add_argument("--max-pages", type=int, default=None,
-                     help="Maximum number of search pages to paginate through")
-    src.add_argument("--detail", action="store_true",
-                     help="Fetch each detail page to enrich records (slower)")
-    src.add_argument("--no-embeddings", action="store_true",
-                     help="Skip embedding generation and SQLite storage")
-    src.add_argument("--no-login", action="store_true",
-                     help="Skip login; use an already-authenticated session (cookies)")
+    src.add_argument(
+        "--search", "-q", default="", help="Search query to run after login"
+    )
+    src.add_argument(
+        "--search-url",
+        default=SEARCH_URL,
+        help="Search results URL (default: %(default)s)",
+    )
+    src.add_argument(
+        "--max-pages",
+        type=int,
+        default=None,
+        help="Maximum number of search pages to paginate through",
+    )
+    src.add_argument(
+        "--detail",
+        action="store_true",
+        help="Fetch each detail page to enrich records (slower)",
+    )
+    src.add_argument(
+        "--no-embeddings",
+        action="store_true",
+        help="Skip embedding generation and SQLite storage",
+    )
+    src.add_argument(
+        "--no-login",
+        action="store_true",
+        help="Skip login; use an already-authenticated session (cookies)",
+    )
 
     misc = parser.add_argument_group("misc")
     misc.add_argument("--timeout", type=int, default=30, help="HTTP timeout in seconds")
-    misc.add_argument("--log-level", default="INFO",
-                      choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-                      help="Logging level (default: INFO)")
+    misc.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Logging level (default: INFO)",
+    )
 
     return parser
 
@@ -77,31 +123,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     if not args.no_login:
-        if not args.username or not args.password:
-            parser.error(
-                "--username and --password are required "
-                "(or set SABI_USERNAME/SABI_PASSWORD)"
-            )
-        logger.info("logging in as %s", args.username)
+        logger.info("establishing session with SABI Informa")
         try:
-            ok = client.login(args.username, args.password)
+            ok = client.login(args.username or "", args.password or "")
         except Exception as exc:  # noqa: BLE001
-            logger.error("login failed: %s", exc)
+            logger.error("session setup failed: %s", exc)
             return 1
         if not ok:
-            logger.error("login failed: invalid credentials or unexpected response")
+            logger.error("session setup failed: could not authenticate")
             return 1
-        logger.info("login succeeded")
+        logger.info("session established")
+    else:
+        client.authenticated = True
+        logger.info("skipping login; using existing session")
 
-    logger.info(
-        "searching%s", f" for '{args.search}'" if args.search else ""
-    )
+    logger.info("searching%s", f" for '{args.search}'" if args.search else "")
 
     try:
         records = []
-        for record in client.iter_search(
-            query=args.search, max_pages=args.max_pages
-        ):
+        for record in client.iter_search(query=args.search, max_pages=args.max_pages):
             if args.detail and record.detail_url:
                 record = client.get_record(record.detail_url)
             records.append(record)

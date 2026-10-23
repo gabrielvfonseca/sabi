@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Executable entry point for the sabi-extractor CLI.
 
-This lets you run the extractor without installing the package:
+Run without installing the package:
 
     ./bin/sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
         --search "madrid software"
 
-It is also the file referenced by CI/release workflows for direct invocation.
+Also referenced by CI/release workflows for direct invocation.
 """
 
 from __future__ import annotations

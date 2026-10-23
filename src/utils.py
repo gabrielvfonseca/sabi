@@ -6,6 +6,9 @@ import csv
 import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import Any
+
+from .models import Record
 
 CSV_FIELDS = [
     "name",
@@ -25,19 +28,27 @@ def clean(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
 
-def record_to_row(record: Mapping, fields: Iterable[str] = CSV_FIELDS) -> dict:
+def record_to_row(
+    record: Mapping[str, Any],
+    fields: Iterable[str] = CSV_FIELDS,
+) -> dict[str, Any]:
     """Convert a record mapping to a CSV row dict limited to *fields*."""
     return {field: record.get(field, "") for field in fields}
 
 
 def write_csv(
-    records: Iterable[Mapping],
+    records: Iterable[Record | Mapping[str, Any]],
     path: str,
     fields: Iterable[str] = CSV_FIELDS,
 ) -> int:
     """Write records to a CSV file. Returns the number of rows written."""
     fields = list(fields)
-    rows = [record_to_row(r, fields) for r in records]
+    rows: list[dict[str, Any]] = []
+    for record in records:
+        if isinstance(record, Record):
+            rows.append(record.to_row())
+        else:
+            rows.append({field: record.get(field, "") for field in fields})
     with Path(path).open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()

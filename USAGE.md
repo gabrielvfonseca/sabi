@@ -5,7 +5,7 @@
 ## Prerequisites
 
 - Python 3.10+
-- A valid SABI Informa account with credentials
+- Network access to SABI Informa (credentials optional on IP-authenticated networks)
 
 Install the package:
 
@@ -21,7 +21,13 @@ pip install -e ".[embeddings]"
 
 ## Credentials
 
-Provide credentials either via flags or environment variables:
+Credentials are optional when running on an IP-authenticated network
+(e.g. NOVA SBE wifi). If you omit them, the extractor establishes a
+session via network/IP authentication instead of the username/password
+flow.
+
+Provide credentials either via flags or environment variables when
+needed:
 
 - `--username` / `--password`
 - `SABI_USERNAME` / `SABI_PASSWORD` environment variables
@@ -32,10 +38,20 @@ Example:
 export SABI_USERNAME="your-username"
 export SABI_PASSWORD="your-password"
 ```
-
 ## Basic usage
 
 Run a search and write results to CSV:
+
+```bash
+python -m src.cli \
+    --search "madrid software" \
+    --output records.csv
+```
+
+On an IP-authenticated network (e.g. NOVA SBE wifi), no credentials are
+needed — the session is established via your network address.
+
+With explicit credentials:
 
 ```bash
 python -m src.cli \
@@ -45,11 +61,20 @@ python -m src.cli \
     --output records.csv
 ```
 
-This logs in, searches for "madrid software", paginates through all result pages, and writes `records.csv`.
+This logs in, searches for "madrid software", paginates through all
+result pages, and writes `records.csv`.
 
 ## Using the installed entry point
 
 After installation, the `sabi-extractor` console script is available:
+
+```bash
+sabi-extractor --search "madrid software" \
+    --output records.csv \
+    --db records.sqlite
+```
+
+With credentials:
 
 ```bash
 sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
@@ -59,6 +84,12 @@ sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
 ```
 
 Or via the executable `bin` script without installing:
+
+```bash
+./bin/sabi-extractor --search "madrid software"
+```
+
+With credentials:
 
 ```bash
 ./bin/sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
@@ -71,11 +102,14 @@ Or via the executable `bin` script without installing:
 
 | Option | Env var | Description |
 |--------|---------|-------------|
-| `--username` | `SABI_USERNAME` | SABI Informa username |
-| `--password` | `SABI_PASSWORD` | SABI Informa password |
+| `--username` | `SABI_USERNAME` | SABI Informa username (optional on IP-authenticated networks) |
+| `--password` | `SABI_PASSWORD` | SABI Informa password (optional on IP-authenticated networks) |
 | `--login-page-url` | — | Login page URL (default: `https://sabi.informa.es/ip`) |
+| `--no-login` | — | Skip login; use an already-authenticated session (cookies) |
 
-Both `--username` and `--password` are required unless `--no-login` is set or the corresponding env vars are defined.
+Credentials are optional on IP-authenticated networks. When omitted, the
+extractor establishes a session via network/IP authentication instead of
+the username/password flow.
 
 ### Output
 
@@ -105,7 +139,15 @@ Both `--username` and `--password` are required unless `--no-login` is set or th
 
 ## Examples
 
-Search and export to CSV only:
+Search and export to CSV only (network auth, no credentials needed):
+
+```bash
+sabi-extractor --search "barcelona consulting" \
+    --output barcelona_consulting.csv \
+    --no-embeddings
+```
+
+With credentials:
 
 ```bash
 sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
@@ -117,8 +159,7 @@ sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
 Paginate at most 5 pages and store with embeddings in SQLite:
 
 ```bash
-sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
-    --search "madrid software" \
+sabi-extractor --search "madrid software" \
     --max-pages 5 \
     --output records.csv \
     --db records.sqlite
@@ -127,8 +168,7 @@ sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
 Fetch detail pages for each record (slower, enriches name/CIF):
 
 ```bash
-sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
-    --search "madrid software" \
+sabi-extractor --search "madrid software" \
     --detail \
     --output records_detail.csv
 ```
@@ -136,8 +176,7 @@ sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
 Export a custom subset of CSV fields:
 
 ```bash
-sabi-extractor --username "$SABI_USERNAME" --password "$SABI_PASSWORD" \
-    --search "madrid software" \
+sabi-extractor --search "madrid software" \
     --fields name,cif,city,activity \
     --output records.csv
 ```
@@ -156,7 +195,17 @@ Build the image:
 docker build -t sabi-extractor -f docker/Dockerfile .
 ```
 
-Run with a mounted output directory:
+Run with a mounted output directory (network auth, no credentials needed):
+
+```bash
+docker run --rm \
+  -v "$PWD/data:/data" \
+  sabi-extractor --search "madrid software" \
+    --output /data/sabi_records.csv \
+    --db /data/sabi_records.sqlite
+```
+
+With credentials:
 
 ```bash
 docker run --rm \
@@ -166,6 +215,12 @@ docker run --rm \
   sabi-extractor --search "madrid software" \
     --output /data/sabi_records.csv \
     --db /data/sabi_records.sqlite
+```
+
+Run the MCP server over streamable-http:
+
+```bash
+docker compose up sabi-mcp
 ```
 
 ## Output
