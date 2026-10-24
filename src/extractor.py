@@ -259,8 +259,8 @@ class SABIClient:
     def _extract_form_tokens(self, html: str) -> None:
         soup = BeautifulSoup(html, "html.parser")
         for inp in soup.find_all("input", {"type": "hidden", "name": True}):
-            name = inp.get("name", "")
-            value = inp.get("value", "")
+            name = str(inp.get("name", "") or "")
+            value = str(inp.get("value", "") or "")
             if name == "__VIEWSTATE":
                 self.viewstate = value
             elif name == "__VIEWSTATEGENERATOR":

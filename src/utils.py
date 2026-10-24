@@ -126,3 +126,35 @@ def to_json(records: Iterable[Record | Mapping[str, Any]]) -> str:
 def list_fields() -> list[str]:
     """Return the canonical list of record field names."""
     return list(CSV_FIELDS)
+
+
+def coerce_record(row: Mapping[str, Any]) -> Record:
+    """Build a Record from a CSV/JSON row, coercing list/int fields.
+
+    JSON-encoded list fields (directors, auditors, shareholders, subsidiaries)
+    are parsed back into Python lists; numeric fields are coerced to int when
+    possible.
+    """
+    data = {k: (v if v is not None else "") for k, v in row.items()}
+    for key in ("directors", "auditors", "shareholders", "subsidiaries"):
+        val = data.get(key)
+        if isinstance(val, str):
+            try:
+                data[key] = json.loads(val)
+            except (TypeError, json.JSONDecodeError):
+                data[key] = []
+        elif not isinstance(val, list):
+            data[key] = []
+    if "group_companies_count" in data:
+        try:
+            data["group_companies_count"] = int(data["group_companies_count"] or 0)
+        except (TypeError, ValueError):
+            data["group_companies_count"] = 0
+    if "available_years" in data:
+        try:
+            data["available_years"] = int(data["available_years"] or 0)
+        except (TypeError, ValueError):
+            data["available_years"] = 0
+    data.pop("extras", None)
+    valid = {k: v for k, v in data.items() if k in Record.__dataclass_fields__}
+    return Record(**valid)  # type: ignore[arg-type]

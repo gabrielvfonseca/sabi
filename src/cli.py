@@ -11,7 +11,7 @@ from pathlib import Path
 from .embeddings import EmbeddingStore
 from .extractor import LOGIN_PAGE_URL, SABIClient
 from .models import Record
-from .utils import CSV_FIELDS, list_fields, read_csv, to_json, write_csv
+from .utils import CSV_FIELDS, coerce_record, list_fields, read_csv, to_json, write_csv
 
 logger = logging.getLogger("sabi_extractor")
 
@@ -187,11 +187,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.import_csv:
         logger.info("importing records from %s", args.import_csv)
         for row in read_csv(args.import_csv):
-            records.append(
-                Record(
-                    **{k: v for k, v in row.items() if k in Record.__dataclass_fields__}
-                )
-            )
+            records.append(coerce_record(row))
     else:
         logger.info("searching%s", f" for '{args.search}'" if args.search else "")
         try:

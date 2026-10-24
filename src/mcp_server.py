@@ -24,7 +24,7 @@ from mcp.server.mcpserver import MCPServer
 from .embeddings import EmbeddingStore
 from .extractor import LOGIN_PAGE_URL, SABIClient
 from .models import Record
-from .utils import CSV_FIELDS, list_fields, read_csv, write_csv
+from .utils import CSV_FIELDS, coerce_record, list_fields, read_csv, write_csv
 
 server = MCPServer(
     name="sabi",
@@ -295,9 +295,7 @@ def sabi_import_csv(
 
         count = 0
         for row in rows:
-            record = Record(
-                **{k: v for k, v in row.items() if k in Record.__dataclass_fields__}
-            )
+            record = coerce_record(row)
             store.upsert(record)
             count += 1
         return json.dumps(
