@@ -6,10 +6,12 @@ import argparse
 import logging
 import os
 from collections.abc import Sequence
+from pathlib import Path
 
 from .embeddings import EmbeddingStore
 from .extractor import LOGIN_PAGE_URL, SABIClient
-from .utils import CSV_FIELDS, write_csv
+from .models import Record
+from .utils import CSV_FIELDS, list_fields, read_csv, to_json, write_csv
 
 logger = logging.getLogger("sabi_extractor")
 
@@ -17,7 +19,7 @@ logger = logging.getLogger("sabi_extractor")
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sabi",
-        description="Extract SABI Informa company records to CSV and SQLite.",
+        description="Extract SABI Informa company records to CSV, JSON, and SQLite.",
     )
 
     auth = parser.add_argument_group("authentication")
@@ -38,27 +40,25 @@ def build_parser() -> argparse.ArgumentParser:
         default=LOGIN_PAGE_URL,
         help="Login page URL (default: %(default)s)",
     )
-    out = parser.add_argument_group("output")
-    out.add_argument(
-        "--output",
-        "-o",
-        default="sabi_records.csv",
-        help="Output CSV path (default: sabi_records.csv)",
+    auth.add_argument(
+        "--no-login",
+        action="store_true",
+        help="Skip login; use an already-authenticated session (e.g. reuse cookies)",
     )
-    out.add_argument(
-        "--fields",
-        default=",".join(CSV_FIELDS),
-        help="Comma-separated CSV fields (default: all standard fields)",
-    )
-    out.add_argument(
-        "--db",
-        default="sabi_records.sqlite",
-        help="SQLite database path (default: sabi_records.sqlite)",
+    auth.add_argument(
+        "--cookie-file",
+        default="",
+        help="Netscape cookie file to load before login and save after login",
     )
 
     src = parser.add_argument_group("source")
     src.add_argument(
         "--search", "-q", default="", help="Search query to run after login"
+    )
+    src.add_argument(
+        "--search-url",
+        default="",
+        help="Override the search results URL (default: auto-detected)",
     )
     src.add_argument(
         "--max-pages",
@@ -72,9 +72,59 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fetch each detail page to enrich records (slower)",
     )
     src.add_argument(
-        "--no-embeddings",
+        "--retry",
+        type=int,
+        default=3,
+        help="Number of retries on transient HTTP errors (default: 3)",
+    )
+    src.add_argument(
+        "--backoff",
+        type=float,
+        default=1.5,
+        help="Backoff multiplier between retries (default: 1.5)",
+    )
+    src.add_argument(
+        "--import-csv",
+        default="",
+        help="Import records from a CSV file instead of searching SABI",
+    )
+
+    out = parser.add_argument_group("output")
+    out.add_argument(
+        "--output",
+        "-o",
+        default="sabi_records.csv",
+        help="Output CSV path (default: sabi_records.csv)",
+    )
+    out.add_argument(
+        "--no-csv",
         action="store_true",
-        help="Skip embedding generation and SQLite storage",
+        help="Do not write a CSV file",
+    )
+    out.add_argument(
+        "--json",
+        default="",
+        help="Also write records to a JSON file path",
+    )
+    out.add_argument(
+        "--fields",
+        default=",".join(CSV_FIELDS),
+        help="Comma-separated CSV fields (default: all standard fields)",
+    )
+    out.add_argument(
+        "--db",
+        default="sabi_records.sqlite",
+        help="SQLite database path (default: sabi_records.sqlite)",
+    )
+    out.add_argument(
+        "--no-db",
+        action="store_true",
+        help="Do not store records in SQLite",
+    )
+    out.add_argument(
+        "--list-fields",
+        action="store_true",
+        help="Print the available CSV field names and exit",
     )
 
     misc = parser.add_argument_group("misc")
@@ -98,41 +148,74 @@ def main(argv: Sequence[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
+    if args.list_fields:
+        for field in list_fields():
+            print(field)
+        return 0
+
     fields = [f.strip() for f in args.fields.split(",") if f.strip()]
 
     client = SABIClient(
         login_page_url=args.login_page_url,
         timeout=args.timeout,
+        retries=args.retry,
+        backoff=args.backoff,
+        cookie_file=args.cookie_file,
     )
+    if args.search_url:
+        client.search_url = args.search_url
 
-    logger.info("establishing session with SABI Informa")
-    try:
-        ok = client.login(args.username or "", args.password or "")
-    except Exception as exc:  # noqa: BLE001
-        logger.error("session setup failed: %s", exc)
-        return 1
-    if not ok:
-        logger.error("session setup failed: could not authenticate")
-        return 1
-    logger.info("session established")
+    if not args.no_login:
+        logger.info("establishing session with SABI Informa")
+        try:
+            ok = client.login(args.username or "", args.password or "")
+        except Exception as exc:  # noqa: BLE001
+            logger.error("session setup failed: %s", exc)
+            return 1
+        if not ok:
+            logger.error("session setup failed: could not authenticate")
+            return 1
+        logger.info("session established")
+        if args.cookie_file:
+            client.save_cookies(args.cookie_file)
+    else:
+        client.authenticated = True
+        logger.info("skipping login (--no-login)")
 
-    logger.info("searching%s", f" for '{args.search}'" if args.search else "")
+    records: list[Record] = []
 
-    try:
-        records = []
-        for record in client.iter_search(query=args.search, max_pages=args.max_pages):
-            if args.detail and record.detail_url:
-                seqnr = record.extras.get("seqnr", "") if record.extras else ""
-                record = client.get_record(record.detail_url, seqnr)
-            records.append(record)
-    except Exception as exc:  # noqa: BLE001
-        logger.error("extraction failed: %s", exc)
-        return 1
+    if args.import_csv:
+        logger.info("importing records from %s", args.import_csv)
+        for row in read_csv(args.import_csv):
+            records.append(
+                Record(
+                    **{k: v for k, v in row.items() if k in Record.__dataclass_fields__}
+                )
+            )
+    else:
+        logger.info("searching%s", f" for '{args.search}'" if args.search else "")
+        try:
+            for record in client.iter_search(
+                query=args.search, max_pages=args.max_pages
+            ):
+                if args.detail and record.detail_url:
+                    seqnr = record.extras.get("seqnr", "") if record.extras else ""
+                    record = client.get_record(record.detail_url, seqnr)
+                records.append(record)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("extraction failed: %s", exc)
+            return 1
 
-    count = write_csv(records, args.output, fields=fields)
-    logger.info("wrote %d records to %s", count, args.output)
+    if args.json:
+        with Path(args.json).open("w", encoding="utf-8") as fh:
+            fh.write(to_json(records))
+        logger.info("wrote %d records to %s", len(records), args.json)
 
-    if not args.no_embeddings:
+    if not args.no_csv:
+        count = write_csv(records, args.output, fields=fields)
+        logger.info("wrote %d records to %s", count, args.output)
+
+    if not args.no_db:
         store = EmbeddingStore(db_path=args.db)
         try:
             stored = store.upsert_many(records)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -86,3 +87,42 @@ def write_csv(
         writer.writeheader()
         writer.writerows(rows)
     return len(rows)
+
+
+def read_csv(path: str, fields: Iterable[str] | None = None) -> list[dict[str, Any]]:
+    """Read a CSV file into a list of row dicts.
+
+    JSON-encoded list fields (directors, auditors, shareholders, subsidiaries)
+    are parsed back into Python lists when present.
+    """
+    fields = list(fields) if fields else None
+    rows: list[dict[str, Any]] = []
+    with Path(path).open("r", newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        for raw in reader:
+            row = {k: (v or "") for k, v in raw.items()}
+            for key in ("directors", "auditors", "shareholders", "subsidiaries"):
+                val = row.get(key)
+                if val:
+                    try:
+                        row[key] = json.loads(val)
+                    except (TypeError, json.JSONDecodeError):
+                        row[key] = []
+            rows.append(row)
+    return rows
+
+
+def to_json(records: Iterable[Record | Mapping[str, Any]]) -> str:
+    """Serialize records to a JSON string (UTF-8, non-ASCII preserved)."""
+    out = []
+    for record in records:
+        if isinstance(record, Record):
+            out.append(record.to_row())
+        else:
+            out.append(dict(record))
+    return json.dumps(out, ensure_ascii=False)
+
+
+def list_fields() -> list[str]:
+    """Return the canonical list of record field names."""
+    return list(CSV_FIELDS)

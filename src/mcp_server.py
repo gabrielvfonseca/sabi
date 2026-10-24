@@ -14,6 +14,8 @@ Run (streamable-HTTP transport):
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
 import os
 
@@ -22,7 +24,7 @@ from mcp.server.mcpserver import MCPServer
 from .embeddings import EmbeddingStore
 from .extractor import LOGIN_PAGE_URL, SABIClient
 from .models import Record
-from .utils import CSV_FIELDS, write_csv
+from .utils import CSV_FIELDS, list_fields, read_csv, write_csv
 
 server = MCPServer(
     name="sabi",
@@ -73,6 +75,24 @@ def _records_to_json(records: list[Record]) -> str:
             }
             for r in records
         ],
+        ensure_ascii=False,
+    )
+
+
+def _record_to_json(record: Record) -> str:
+    return json.dumps(
+        {
+            "name": record.name,
+            "cif": record.cif,
+            "address": record.address,
+            "city": record.city,
+            "province": record.province,
+            "postal_code": record.postal_code,
+            "phone": record.phone,
+            "activity": record.activity,
+            "detail_url": record.detail_url,
+            "extras": record.extras,
+        },
         ensure_ascii=False,
     )
 
@@ -234,6 +254,75 @@ def sabi_list_stored(
         return json.dumps(store.all(), ensure_ascii=False)
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": str(exc)}, ensure_ascii=False)
+
+
+@server.tool()
+def sabi_list_fields() -> str:
+    """Return the canonical list of record field names available for export."""
+    try:
+        return json.dumps(list_fields(), ensure_ascii=False)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)}, ensure_ascii=False)
+
+
+@server.tool()
+def sabi_import_csv(
+    csv_path: str = "",
+    csv_text: str = "",
+    db_path: str = "sabi_records.sqlite",
+) -> str:
+    """Import records from a CSV file (or raw CSV text) into the SQLite store.
+
+    Args:
+        csv_path: Path to a CSV file. Ignored if *csv_text* is provided.
+        csv_text: Raw CSV content as a string.
+        db_path: SQLite database path.
+
+    Returns a JSON status with the number of imported records.
+    """
+    try:
+        store = _get_store(db_path)
+        if csv_text:
+            reader = csv.DictReader(io.StringIO(csv_text))
+            rows = [{k: (v or "") for k, v in row.items()} for row in reader]
+        elif csv_path:
+            rows = read_csv(csv_path)
+        else:
+            return json.dumps(
+                {"status": "error", "error": "provide csv_path or csv_text"},
+                ensure_ascii=False,
+            )
+
+        count = 0
+        for row in rows:
+            record = Record(
+                **{k: v for k, v in row.items() if k in Record.__dataclass_fields__}
+            )
+            store.upsert(record)
+            count += 1
+        return json.dumps(
+            {"status": "ok", "imported": count, "db_path": db_path},
+            ensure_ascii=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False)
+
+
+@server.tool()
+def sabi_delete_record(cif: str, db_path: str = "sabi_records.sqlite") -> str:
+    """Delete a stored record by CIF from the SQLite database.
+
+    Returns a JSON status with whether the record was found and removed.
+    """
+    try:
+        store = _get_store(db_path)
+        deleted = store.delete(cif)
+        return json.dumps(
+            {"status": "ok", "deleted": deleted, "cif": cif},
+            ensure_ascii=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False)
 
 
 def main(argv: list[str] | None = None) -> int:

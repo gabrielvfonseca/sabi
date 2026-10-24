@@ -6,6 +6,7 @@ import logging
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import urljoin
 
 import requests  # type: ignore[import-untyped]
@@ -36,11 +37,17 @@ class SABIClient:
         login_page_url: str = LOGIN_PAGE_URL,
         search_url: str = "",
         timeout: int = 30,
+        retries: int = 3,
+        backoff: float = 1.5,
+        cookie_file: str = "",
     ):
         self.base_url = base_url
         self.login_page_url = login_page_url
         self.search_url = search_url
         self.timeout = timeout
+        self.retries = max(0, retries)
+        self.backoff = max(1.0, backoff)
+        self.cookie_file = cookie_file
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -55,6 +62,105 @@ class SABIClient:
         self.viewstategenerator: str = ""
         self.eventvalidation: str = ""
         self._list_page_html: str = ""
+        if cookie_file:
+            self._load_cookies()
+
+    # ------------------------------------------------------------------ #
+    # HTTP helpers (retry / backoff / cookies)
+    # ------------------------------------------------------------------ #
+    def _load_cookies(self) -> None:
+        """Load a cookie jar from a Netscape-style cookie file."""
+        if not self.cookie_file:
+            return
+        path = Path(self.cookie_file)
+        if not path.exists():
+            return
+        try:
+            import http.cookiejar
+
+            jar = http.cookiejar.MozillaCookieJar(str(path))
+            jar.load()
+            for cookie in jar:
+                self.session.cookies.set(
+                    cookie.name, cookie.value, domain=cookie.domain, path=cookie.path
+                )
+            logger.info("loaded %d cookies from %s", len(jar), path)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("failed to load cookies from %s: %s", path, exc)
+
+    def save_cookies(self, path: str = "") -> None:
+        """Persist the current session cookies to a Netscape cookie file."""
+        path = path or self.cookie_file
+        if not path:
+            return
+        try:
+            import http.cookiejar
+
+            jar = http.cookiejar.MozillaCookieJar()
+            for cookie in self.session.cookies:
+                jar.set_cookie(cookie)
+            jar.save(str(path), ignore_expires=True, ignore_discard=True)
+            logger.info("saved %d cookies to %s", len(jar), path)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("failed to save cookies to %s: %s", path, exc)
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        data: dict | None = None,
+        timeout: int | None = None,
+    ) -> requests.Response:
+        """Run an HTTP request with retry/backoff on transient errors."""
+        import time
+
+        last_exc: Exception | None = None
+        for attempt in range(1, self.retries + 1):
+            try:
+                resp = self.session.request(
+                    method,
+                    url,
+                    data=data,
+                    timeout=timeout or self.timeout,
+                    allow_redirects=True,
+                )
+                if (
+                    resp.status_code in (429, 500, 502, 503, 504)
+                    and attempt < self.retries
+                ):
+                    wait = self.backoff ** (attempt - 1)
+                    logger.warning(
+                        "%s %s -> %s, retrying in %.1fs (%d/%d)",
+                        method,
+                        url,
+                        resp.status_code,
+                        wait,
+                        attempt,
+                        self.retries,
+                    )
+                    time.sleep(wait)
+                    continue
+                return resp
+            except (requests.ConnectionError, requests.Timeout) as exc:
+                last_exc = exc
+                if attempt < self.retries:
+                    wait = self.backoff ** (attempt - 1)
+                    logger.warning(
+                        "%s %s failed: %s, retrying in %.1fs (%d/%d)",
+                        method,
+                        url,
+                        exc,
+                        wait,
+                        attempt,
+                        self.retries,
+                    )
+                    time.sleep(wait)
+                    continue
+                raise
+        if last_exc:
+            raise last_exc
+        raise RuntimeError("request failed without exception")
 
     def login(self, username: str = "", password: str = "") -> bool:
         """Authenticate with SABI Informa.
@@ -69,27 +175,70 @@ class SABIClient:
 
         Returns True if authentication appears to have succeeded.
         """
-        if not username and not password:
-            return self._login_network()
-
-        raise NotImplementedError(
-            "Credential-based login not yet implemented for new site"
-        )
+        if username and password:
+            return self._login_credentials(username, password)
+        return self._login_network()
 
     def _login_network(self) -> bool:
         """Establish an IP/network-authenticated session without credentials."""
         logger.info("using network/IP authentication (no credentials provided)")
 
-        resp = self.session.get(self.login_page_url, timeout=self.timeout)
+        resp = self._request("GET", self.login_page_url)
         resp.raise_for_status()
 
         self.version_prefix = self._extract_version_prefix(resp.url)
         logger.info("detected version prefix: %s", self.version_prefix)
 
         search_url = self._build_search_url()
-        resp = self.session.get(search_url, timeout=self.timeout)
+        resp = self._request("GET", search_url)
         resp.raise_for_status()
 
+        self._extract_form_tokens(resp.text)
+
+        self.authenticated = self._is_authenticated(resp)
+        return self.authenticated
+
+    def _login_credentials(self, username: str, password: str) -> bool:
+        """Authenticate with username and password via the SABI login form.
+
+        SABI uses a two-step ASP.NET postback: first the username is submitted,
+        then the password (plus any OTP/second-factor prompt). We discover the
+        form fields from the login page, POST the username, then POST the
+        password, and finally verify we reached an authenticated state.
+        """
+        logger.info("using credential authentication (username provided)")
+        login_url = self.login_page_url
+
+        # Step 1: fetch login page to discover CSRF/version tokens.
+        resp = self._request("GET", login_url)
+        resp.raise_for_status()
+        self.version_prefix = self._extract_version_prefix(resp.url)
+        self._extract_form_tokens(resp.text)
+
+        # Step 2: submit username.
+        data = self._build_postback_data(
+            "ContentContainer1$ctl00$Header$ctl00$ctl03$Login1$btnContinue", ""
+        )
+        data["ContentContainer1$ctl00$Header$ctl00$ctl03$Login1$tbUser"] = username
+        data["ContentContainer1$ctl00$Header$ctl00$ctl03$Login1$tbPassword"] = password
+        resp = self._request("POST", login_url, data=data)
+        resp.raise_for_status()
+        self._extract_form_tokens(resp.text)
+
+        # Step 3: submit password (second postback).
+        data = self._build_postback_data(
+            "ContentContainer1$ctl00$Header$ctl00$ctl03$Login1$btnEnter", ""
+        )
+        data["ContentContainer1$ctl00$Header$ctl00$ctl03$Login1$tbUser"] = username
+        data["ContentContainer1$ctl00$Header$ctl00$ctl03$Login1$tbPassword"] = password
+        resp = self._request("POST", login_url, data=data)
+        resp.raise_for_status()
+        self._extract_form_tokens(resp.text)
+
+        # Step 4: verify we are authenticated by hitting the search page.
+        search_url = self._build_search_url()
+        resp = self._request("GET", search_url)
+        resp.raise_for_status()
         self._extract_form_tokens(resp.text)
 
         self.authenticated = self._is_authenticated(resp)
@@ -143,7 +292,7 @@ class SABIClient:
 
         search_url = self._build_search_url()
 
-        resp = self.session.get(search_url, timeout=self.timeout)
+        resp = self._request("GET", search_url)
         resp.raise_for_status()
         self._extract_form_tokens(resp.text)
 
@@ -160,11 +309,11 @@ class SABIClient:
             "TabAdvancedSearches"
         )
 
-        resp = self.session.post(search_url, data=data, timeout=self.timeout)
+        resp = self._request("POST", search_url, data=data)
         resp.raise_for_status()
 
         list_url = self._build_list_url()
-        resp = self.session.get(list_url, timeout=self.timeout)
+        resp = self._request("GET", list_url)
         resp.raise_for_status()
 
         self._list_page_html = resp.text
@@ -298,7 +447,7 @@ class SABIClient:
                 )
             else:
                 detail_url = self._resolve_detail_url(detail_url)
-        resp = self.session.get(detail_url, timeout=self.timeout)
+        resp = self._request("GET", detail_url)
         resp.raise_for_status()
         return self._parse_detail_page(resp.text, detail_url)
 

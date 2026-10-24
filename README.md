@@ -13,6 +13,10 @@ Extract company records from [SABI Informa](https://sabi.informa.es) to CSV and 
 - MCP server exposing search, export, storage, and similarity search as agent tools
 - Executable `bin/` scripts for running without installation
 - Multiple MCP transports: stdio, SSE, streamable-HTTP
+- Cookie persistence (`--cookie-file`) for resuming authenticated sessions
+- Retry with exponential backoff on transient HTTP errors
+- CSV import/export round-trip and JSON output
+- Full record fidelity in SQLite (all fields + extras serialized as JSON)
 
 ## Installation
 
@@ -93,6 +97,9 @@ Or via the executable bin script:
 | `sabi_store_records` | Search and upsert records (with embeddings) into SQLite |
 | `sabi_similarity_search` | Semantic similarity search over stored records |
 | `sabi_list_stored` | List all records stored in the SQLite database |
+| `sabi_list_fields` | List the available record field names |
+| `sabi_import_csv` | Import records from a CSV file/text into the SQLite store |
+| `sabi_delete_record` | Delete a stored record by CIF |
 
 Example agent call:
 

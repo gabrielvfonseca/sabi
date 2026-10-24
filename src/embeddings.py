@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import sqlite3
 import struct
@@ -65,6 +66,7 @@ class EmbeddingStore:
                 phone         TEXT,
                 activity      TEXT,
                 detail_url    TEXT,
+                record_json   TEXT,
                 embedding     BLOB,
                 created_at    TEXT DEFAULT (datetime('now'))
             );
@@ -75,15 +77,21 @@ class EmbeddingStore:
         self._conn.commit()
 
     def upsert(self, record: Record) -> None:
-        """Insert or replace a record, computing its embedding from name+activity."""
+        """Insert or replace a record, computing its embedding from name+activity.
+
+        The full record (all fields + extras) is serialized to JSON in
+        *record_json* so nothing is lost during storage.
+        """
         text = " ".join(filter(None, [record.name, record.activity, record.city]))
         embedding = self._embed_fn(text)
         blob = self._serialize_embedding(embedding)
+        record_json = json.dumps(record.to_row(), ensure_ascii=False)
         self._conn.execute(
             """
-            INSERT INTO records (cif, name, address, city, province, postal_code,
-                                 phone, activity, detail_url, embedding)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO records
+                (cif, name, address, city, province, postal_code, phone,
+                 activity, detail_url, record_json, embedding)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(cif) DO UPDATE SET
                 name=excluded.name,
                 address=excluded.address,
@@ -93,6 +101,7 @@ class EmbeddingStore:
                 phone=excluded.phone,
                 activity=excluded.activity,
                 detail_url=excluded.detail_url,
+                record_json=excluded.record_json,
                 embedding=excluded.embedding,
                 created_at=datetime('now')
             """,
@@ -106,6 +115,7 @@ class EmbeddingStore:
                 record.phone,
                 record.activity,
                 record.detail_url,
+                record_json,
                 blob,
             ),
         )
@@ -119,12 +129,35 @@ class EmbeddingStore:
         return count
 
     def all(self) -> list[dict]:
+        cur = self._conn.execute("SELECT record_json FROM records ORDER BY name")
+        rows = []
+        for (json_str,) in cur.fetchall():
+            try:
+                rows.append(json.loads(json_str))
+            except (TypeError, json.JSONDecodeError):
+                continue
+        return rows
+
+    def get(self, cif: str) -> dict | None:
         cur = self._conn.execute(
-            "SELECT cif, name, address, city, province, postal_code, phone, "
-            "activity, detail_url FROM records"
+            "SELECT record_json FROM records WHERE cif = ?", (cif,)
         )
-        columns = [d[0] for d in cur.description]
-        return [dict(zip(columns, row, strict=False)) for row in cur.fetchall()]
+        row = cur.fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row[0])
+        except (TypeError, json.JSONDecodeError):
+            return None
+
+    def delete(self, cif: str) -> bool:
+        cur = self._conn.execute("DELETE FROM records WHERE cif = ?", (cif,))
+        self._conn.commit()
+        return cur.rowcount > 0
+
+    def count(self) -> int:
+        cur = self._conn.execute("SELECT COUNT(*) FROM records")
+        return cur.fetchone()[0]
 
     def search_similar(self, query: str, limit: int = 10) -> list[dict]:
         """Return records ordered by cosine similarity to *query* (SQLite fallback).
@@ -135,31 +168,23 @@ class EmbeddingStore:
 
         q_emb = self._embed_fn(query)
         rows = self._conn.execute(
-            "SELECT cif, name, address, city, province, postal_code, phone, "
-            "activity, detail_url, embedding FROM records"
+            "SELECT record_json, embedding FROM records"
         ).fetchall()
 
         scored = []
-        for row in rows:
-            emb = self._deserialize_embedding(row[9])
+        for json_str, blob in rows:
+            emb = self._deserialize_embedding(blob)
             if emb is None:
                 continue
             sim = self._cosine(q_emb, emb)
-            scored.append((sim, row))
+            try:
+                record = json.loads(json_str)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            scored.append((sim, record))
 
         scored.sort(key=lambda x: x[0], reverse=True)
-        columns = [
-            "cif",
-            "name",
-            "address",
-            "city",
-            "province",
-            "postal_code",
-            "phone",
-            "activity",
-            "detail_url",
-        ]
-        return [dict(zip(columns, row, strict=False)) for _, row in scored[:limit]]
+        return [record for _, record in scored[:limit]]
 
     def close(self) -> None:
         self._conn.close()

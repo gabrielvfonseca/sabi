@@ -104,24 +104,30 @@ Requires `SABI_USERNAME` and `SABI_PASSWORD` environment variables.
 | `--password` | `SABI_PASSWORD` | SABI Informa password |
 | `--login-page-url` | — | Login page URL (default: `https://sabi.informa.es/ip`) |
 | `--no-login` | — | Skip login; use an already-authenticated session (cookies) |
+| `--cookie-file` | — | Netscape cookie file to load before login and save after login |
 
 ### Output
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--output`, `-o` | `sabi_records.csv` | Output CSV path |
+| `--no-csv` | disabled | Do not write a CSV file |
+| `--json` | — | Also write records to a JSON file |
 | `--fields` | all standard fields | Comma-separated CSV fields |
 | `--db` | `sabi_records.sqlite` | SQLite database path |
+| `--no-db` | disabled | Do not store records in SQLite |
 
 ### Source
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--search`, `-q` | `""` | Search query to run after login |
-| `--search-url` | `https://sabi.informa.es/R1/SabiInforma/Search` | Search results URL |
+| `--search-url` | auto-detected | Override the search results URL |
 | `--max-pages` | no limit | Maximum number of search pages |
 | `--detail` | disabled | Fetch each detail page to enrich records (slower) |
-| `--no-embeddings` | disabled | Skip embedding generation and SQLite storage |
+| `--import-csv` | — | Import records from a CSV file instead of searching SABI |
+| `--retry` | `3` | Number of retries on transient HTTP errors |
+| `--backoff` | `1.5` | Backoff multiplier between retries |
 
 ### Misc
 
@@ -129,6 +135,7 @@ Requires `SABI_USERNAME` and `SABI_PASSWORD` environment variables.
 |--------|---------|-------------|
 | `--timeout` | `30` | HTTP timeout in seconds |
 | `--log-level` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `--list-fields` | disabled | Print available CSV field names and exit |
 
 ## MCP tools API specs
 
@@ -211,6 +218,35 @@ List all records currently stored in the SQLite database.
 
 Returns a JSON array of all stored records.
 
+### sabi_list_fields
+
+Return the canonical list of record field names available for export.
+
+Returns a JSON array of field name strings.
+
+### sabi_import_csv
+
+Import records from a CSV file (or raw CSV text) into the SQLite store.
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `csv_path` | string | — | Path to a CSV file |
+| `csv_text` | string | — | Raw CSV content as a string |
+| `db_path` | string | `sabi_records.sqlite` | SQLite database path |
+
+Returns: `{"status": "ok", "imported": N, "db_path": "..."}`.
+
+### sabi_delete_record
+
+Delete a stored record by CIF from the SQLite database.
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `cif` | string | (required) | Company CIF to delete |
+| `db_path` | string | `sabi_records.sqlite` | SQLite database path |
+
+Returns: `{"status": "ok", "deleted": true/false, "cif": "..."}`.
+
 ## Examples
 
 Search and export to CSV only:
@@ -218,7 +254,7 @@ Search and export to CSV only:
 ```bash
 sabi --search "barcelona consulting" \
     --output barcelona_consulting.csv \
-    --no-embeddings
+    --no-db
 ```
 
 Paginate at most 5 pages and store with embeddings in SQLite:
@@ -250,6 +286,31 @@ Skip login (e.g. reusing an existing authenticated session):
 
 ```bash
 sabi --no-login --search "madrid software" --output records.csv
+```
+
+Save and reuse cookies across runs:
+
+```bash
+sabi --cookie-file cookies.txt --search "madrid software" --output records.csv
+sabi --cookie-file cookies.txt --no-login --search "madrid software" --output records2.csv
+```
+
+Write JSON output in addition to CSV:
+
+```bash
+sabi --search "madrid software" --json records.json
+```
+
+Import records from an existing CSV into the SQLite store:
+
+```bash
+sabi --import-csv existing_records.csv --db records.sqlite --no-csv
+```
+
+List the available CSV field names:
+
+```bash
+sabi --list-fields
 ```
 
 ## Docker

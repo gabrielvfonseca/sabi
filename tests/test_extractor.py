@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 import unittest
@@ -170,6 +171,88 @@ class TestEmbeddings(unittest.TestCase):
             self.assertEqual(results[0]["cif"], "A1")
         finally:
             store.close()
+
+    def test_store_get_and_delete(self):
+        store = EmbeddingStore(db_path=":memory:", embedding_dim=8)
+        try:
+            store.upsert(
+                Record(name="Acme SA", cif="A1", city="Madrid", activity="Software")
+            )
+            self.assertIsNotNone(store.get("A1"))
+            self.assertIsNone(store.get("missing"))
+            self.assertEqual(store.count(), 1)
+            self.assertTrue(store.delete("A1"))
+            self.assertFalse(store.delete("A1"))
+            self.assertEqual(store.count(), 0)
+        finally:
+            store.close()
+
+    def test_store_preserves_full_record_json(self):
+        store = EmbeddingStore(db_path=":memory:", embedding_dim=8)
+        try:
+            store.upsert(
+                Record(
+                    name="Acme SA",
+                    cif="A1",
+                    address="Calle Falsa 123",
+                    city="Madrid",
+                    activity="Software",
+                    revenue="1000",
+                )
+            )
+            fetched = store.get("A1")
+            self.assertIsNotNone(fetched)
+            self.assertEqual(fetched["name"], "Acme SA")
+            self.assertEqual(fetched["address"], "Calle Falsa 123")
+            self.assertEqual(fetched["revenue"], "1000")
+        finally:
+            store.close()
+
+
+class TestUtilsExtended(unittest.TestCase):
+    def test_list_fields(self):
+        from src.utils import list_fields
+
+        fields = list_fields()
+        self.assertIn("name", fields)
+        self.assertIn("cif", fields)
+        self.assertIn("activity", fields)
+        self.assertEqual(fields, list(fields))  # ordered, no dupes
+
+    def test_write_and_read_csv_roundtrip(self):
+        from src.utils import read_csv, write_csv
+
+        records = [
+            Record(
+                name="Acme SA",
+                cif="A1",
+                city="Madrid",
+                activity="Software",
+                directors=[{"name": "John", "role": "CEO"}],
+            ),
+        ]
+        path = Path("/tmp/test_sabi_roundtrip.csv")
+        try:
+            write_csv(records, path)
+            rows = read_csv(str(path))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["name"], "Acme SA")
+            self.assertEqual(rows[0]["cif"], "A1")
+            self.assertEqual(rows[0]["directors"], [{"name": "John", "role": "CEO"}])
+        finally:
+            if path.exists():
+                path.unlink()
+
+    def test_to_json(self):
+        from src.utils import to_json
+
+        records = [
+            Record(name="Acme SA", cif="A1", city="Madrid"),
+        ]
+        data = to_json(records)
+        parsed = json.loads(data)
+        self.assertEqual(parsed[0]["name"], "Acme SA")
+        self.assertEqual(parsed[0]["cif"], "A1")
 
 
 if __name__ == "__main__":

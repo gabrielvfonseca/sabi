@@ -31,10 +31,12 @@ sabi-mcp = "src.mcp_server:main"
 [tool.ruff]
 line-length = 88
 target-version = "py310"
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM", "C4", "PTH"]
 ignore = ["B008", "S101", "S105"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["src"]
 
 [tool.pytest.ini_options]
