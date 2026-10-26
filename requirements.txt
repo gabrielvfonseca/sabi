@@ -1,6 +1,6 @@
-requests>=2.31.0
-beautifulsoup4>=4.12.0
-mcp>=1.0.0
+requests>=2.34.2
+beautifulsoup4>=4.15.0
+mcp>=2.3.0
 
 # Optional: sentence-transformers for real embeddings (falls back to a
 # deterministic hash embedding if not installed).
